@@ -167,6 +167,44 @@ export async function syncLeagueLiveOddsFlags(): Promise<
 }
 
 // ============================================================
+// INVOKE SYNC-ODDS EDGE FUNCTION
+// ============================================================
+
+export type SyncOddsResult = {
+  error?: string;
+  message?: string;
+  synced: number;
+  events?: number;
+  live_odds_changed: boolean;
+  provider_status: string;
+  detail?: string;
+};
+
+export async function invokeSyncOdds(sport?: string): Promise<SyncOddsResult> {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-odds`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sport: sport || "soccer_epl" }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let parsed: Record<string, unknown> = {};
+    try { parsed = JSON.parse(text); } catch { /* raw text */ }
+    return {
+      error: (parsed.error as string) || `HTTP ${res.status}: ${text.slice(0, 200)}`,
+      synced: 0,
+      live_odds_changed: false,
+      provider_status: "error",
+    };
+  }
+  return await res.json();
+}
+
+// ============================================================
 // GET COVERAGE REFRESH LOG
 // ============================================================
 

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useOddsProviders, useOddsMonitor, useCoverageRefreshLog } from "../../lib/adminHooks";
 import { PageHeader, Spinner } from "../../components/ui";
-import { ODDS_STALE_THRESHOLD_HOURS } from "../../lib/oddsProvider";
-import { Radio, CircleX as XCircle, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Clock, Database, ChartBar as BarChart2, Wifi, WifiOff, RefreshCw, ShieldAlert } from "lucide-react";
+import { ODDS_STALE_THRESHOLD_HOURS, invokeSyncOdds } from "../../lib/oddsProvider";
+import type { SyncOddsResult } from "../../lib/oddsProvider";
+import { Radio, CircleX as XCircle, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Clock, Database, ChartBar as BarChart2, Wifi, WifiOff, RefreshCw, ShieldAlert, Play } from "lucide-react";
 
 function timeSince(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -14,9 +16,32 @@ function timeSince(iso: string): string {
 }
 
 export default function OddsMonitor() {
-  const { data: providers, isLoading: pLoading } = useOddsProviders();
-  const { data: monitor, isLoading: mLoading } = useOddsMonitor();
+  const { data: providers, isLoading: pLoading, refetch: refetchProviders } = useOddsProviders();
+  const { data: monitor, isLoading: mLoading, refetch: refetchMonitor } = useOddsMonitor();
   const { data: refreshLog } = useCoverageRefreshLog(5);
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncOddsResult | null>(null);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await invokeSyncOdds();
+      setSyncResult(result);
+      await refetchProviders();
+      await refetchMonitor();
+    } catch (err: unknown) {
+      setSyncResult({
+        error: err instanceof Error ? err.message : String(err),
+        synced: 0,
+        live_odds_changed: false,
+        provider_status: "error",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const isLoading = pLoading || mLoading;
   if (isLoading) return <Spinner />;
@@ -76,6 +101,50 @@ export default function OddsMonitor() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Manual sync */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <h3 className="text-sm font-bold text-white">Manual Odds Sync</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Invokes the sync-odds edge function. If ODDS_API_KEY is not configured, it will fail safely without changing any data.
+            </p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
+            {syncing ? "Syncing..." : "Run Odds Sync"}
+          </button>
+        </div>
+        {syncResult && (
+          <div className={`mt-3 p-3 rounded-xl border ${syncResult.error ? "bg-bad/5 border-bad/20" : "bg-good/5 border-good/20"}`}>
+            <div className="flex items-start gap-2">
+              {syncResult.error ? (
+                <XCircle size={14} className="text-bad shrink-0 mt-0.5" />
+              ) : (
+                <CheckCircle size={14} className="text-good shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className={`text-xs font-semibold ${syncResult.error ? "text-bad" : "text-good"}`}>
+                  {syncResult.error ? "Sync failed" : "Sync completed"}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {syncResult.error || syncResult.message}
+                </p>
+                <div className="flex gap-4 mt-2">
+                  <span className="text-xs text-slate-500">Synced: <span className="font-mono font-bold text-white">{syncResult.synced}</span></span>
+                  <span className="text-xs text-slate-500">Provider: <span className="font-mono font-bold text-white">{syncResult.provider_status}</span></span>
+                  <span className="text-xs text-slate-500">Live odds changed: <span className={`font-mono font-bold ${syncResult.live_odds_changed ? "text-good" : "text-slate-400"}`}>{syncResult.live_odds_changed ? "YES" : "NO"}</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Providers grid */}

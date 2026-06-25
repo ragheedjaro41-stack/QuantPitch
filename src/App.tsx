@@ -23,6 +23,7 @@ import AuditReport from "./pages/admin/AuditReport";
 import AliasQueue from "./pages/admin/AliasQueue";
 import Certification from "./pages/admin/Certification";
 import OddsMonitor from "./pages/admin/OddsMonitor";
+import ProviderSetup from "./pages/admin/ProviderSetup";
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="admin/alias-queue" element={<AliasQueue />} />
         <Route path="admin/certification" element={<Certification />} />
         <Route path="admin/odds-monitor" element={<OddsMonitor />} />
+        <Route path="admin/provider-setup" element={<ProviderSetup />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

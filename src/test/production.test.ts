@@ -322,3 +322,77 @@ describe("Live connection audit", () => {
     }
   });
 });
+
+// ============================================================
+// 8. PROVIDER ACTIVATION SAFETY — sync failure cannot set LIVE
+// ============================================================
+describe("Provider activation safety", () => {
+  it("missing API key cannot produce LIVE_PICK (has_live_odds stays false)", async () => {
+    const league = makeLeague({ has_live_odds: false, is_synthetic: false, playable: true });
+    const result = await computeLeaguePlayability(league, [], undefined);
+    expect(result.pick_status).toBe("BLOCKED_PICK");
+    expect(result.has_live_odds).toBe(false);
+    expect(result.model_flags.odds_backed).toBe(false);
+  });
+
+  it("sync failure does not set LIVE_PICK (has_live_odds remains false after error)", async () => {
+    const league = makeLeague({ has_live_odds: false, is_synthetic: false, playable: true });
+    const result = await computeLeaguePlayability(league, [], undefined);
+    expect(result.pick_status).toBe("BLOCKED_PICK");
+    expect(result.reason).toMatch(/odds_not_live/i);
+    expect(result.model_flags.model_tier).toBe("form_only");
+  });
+
+  it("only fresh inserted odds can set has_live_odds=true (simulated via flag)", async () => {
+    const noOdds = makeLeague({ has_live_odds: false });
+    const r1 = await computeLeaguePlayability(noOdds, [], undefined);
+    expect(r1.pick_status).toBe("BLOCKED_PICK");
+
+    const withOdds = makeLeague({ has_live_odds: true });
+    const r2 = await computeLeaguePlayability(withOdds, [], undefined);
+    expect(r2.pick_status).toBe("LIVE_PICK");
+    expect(r2.model_flags.odds_backed).toBe(true);
+  });
+
+  it("stale odds re-block: has_live_odds flipped back to false produces BLOCKED_PICK", async () => {
+    const freshLeague = makeLeague({ has_live_odds: true });
+    const r1 = await computeLeaguePlayability(freshLeague, [], undefined);
+    expect(r1.pick_status).toBe("LIVE_PICK");
+
+    const staleLeague = makeLeague({ has_live_odds: false });
+    const r2 = await computeLeaguePlayability(staleLeague, [], undefined);
+    expect(r2.pick_status).toBe("BLOCKED_PICK");
+    expect(r2.model_flags.odds_backed).toBe(false);
+  });
+
+  it("model_tier downgrades from odds_form to form_only when odds go stale", () => {
+    const fresh = buildModelFlags({ has_live_odds: true, has_xg: false, has_stats: true, has_settlement: true });
+    expect(fresh.model_tier).toBe("odds_form");
+    expect(fresh.odds_backed).toBe(true);
+
+    const stale = buildModelFlags({ has_live_odds: false, has_xg: false, has_stats: true, has_settlement: true });
+    expect(stale.model_tier).toBe("form_only");
+    expect(stale.odds_backed).toBe(false);
+  });
+
+  it("safety rules still block even with live odds (not bypassed by fresh odds)", async () => {
+    const league = makeLeague({ tier: 4, has_live_odds: true, odds_coverage: 10 });
+    const rule = makeSafetyRule({ tier_applies_to: [4], min_odds_coverage: 40 });
+    const result = await computeLeaguePlayability(league, [rule], undefined);
+    expect(result.pick_status).toBe("BLOCKED_PICK");
+    expect(result.has_live_odds).toBe(true);
+  });
+
+  it("LIVE_PICK transitions: false->BLOCKED, true->LIVE, true->false->BLOCKED", async () => {
+    const states: Array<{ live: boolean; expected: string }> = [
+      { live: false, expected: "BLOCKED_PICK" },
+      { live: true, expected: "LIVE_PICK" },
+      { live: false, expected: "BLOCKED_PICK" },
+    ];
+    for (const s of states) {
+      const league = makeLeague({ has_live_odds: s.live });
+      const result = await computeLeaguePlayability(league, [], undefined);
+      expect(result.pick_status).toBe(s.expected);
+    }
+  });
+});
