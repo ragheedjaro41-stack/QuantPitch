@@ -25,6 +25,7 @@ const adminNav = [
   { to: "/admin/alias-queue",          label: "Alias Queue",     icon: Tag },
   { to: "/admin/odds-monitor",          label: "Odds Monitor",    icon: Radio },
   { to: "/admin/api-football",          label: "API-Football",    icon: Zap },
+  { to: "/admin/player-sync",          label: "Player Sync",     icon: Users },
   { to: "/admin/provider-setup",       label: "Provider Setup",  icon: Key },
   { to: "/admin/settlement",            label: "Settlement",      icon: Scale },
   { to: "/admin/activation",            label: "Activation",      icon: ListChecks },

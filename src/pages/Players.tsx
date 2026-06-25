@@ -70,9 +70,13 @@ function PlayerCard({ player }: { player: PlayerWithTeam }) {
       className="card card-hover p-4 group"
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-base-700 text-sm font-semibold text-slate-300">
-          {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-        </div>
+        {player.photo_url ? (
+          <img src={player.photo_url} alt={player.name} className="h-12 w-12 rounded-xl object-cover bg-base-700" loading="lazy" />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-base-700 text-sm font-semibold text-slate-300">
+            {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white group-hover:text-accent transition-colors truncate">
             {player.name}
@@ -83,7 +87,7 @@ function PlayerCard({ player }: { player: PlayerWithTeam }) {
           className="font-mono text-sm font-bold"
           style={{ color: ratingColor(player.rating) }}
         >
-          {player.rating.toFixed(1)}
+          {player.rating > 0 ? player.rating.toFixed(1) : "--"}
         </span>
       </div>
 

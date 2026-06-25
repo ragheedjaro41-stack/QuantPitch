@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { Flag, Ruler, Weight, Cake } from "lucide-react";
+import { Flag, Ruler, Weight, Cake, CircleAlert as AlertCircle } from "lucide-react";
 import {
   RadarChart,
   PolarGrid,
@@ -19,26 +19,46 @@ export default function PlayerDetail() {
   if (isLoading) return <Spinner />;
   if (!player) return <ErrorState message="Player not found" />;
 
-  const radarData = [
-    { stat: "Goals", value: Math.min(player.goals * 6, 100) },
-    { stat: "Assists", value: Math.min(player.assists * 10, 100) },
-    { stat: "Apps", value: Math.min(player.appearances * 4.5, 100) },
-    { stat: "Rating", value: (player.rating / 10) * 100 },
-    { stat: "Form", value: Math.min((player.goals + player.assists) * 5, 100) },
-  ];
+  const isGK = player.position === "GK";
+  const minPerGoal = player.goals > 0 ? Math.round(player.minutes_played / player.goals) : null;
+
+  const radarData = isGK
+    ? [
+        { stat: "Apps", value: Math.min(player.appearances * 3, 100) },
+        { stat: "CS", value: Math.min(player.clean_sheets * 8, 100) },
+        { stat: "Saves", value: Math.min(player.saves * 2, 100) },
+        { stat: "Rating", value: (player.rating / 10) * 100 },
+        { stat: "Minutes", value: Math.min(player.minutes_played / 35, 100) },
+      ]
+    : [
+        { stat: "Goals", value: Math.min(player.goals * 5, 100) },
+        { stat: "Assists", value: Math.min(player.assists * 8, 100) },
+        { stat: "Apps", value: Math.min(player.appearances * 3, 100) },
+        { stat: "Rating", value: (player.rating / 10) * 100 },
+        { stat: "Minutes", value: Math.min(player.minutes_played / 35, 100) },
+      ];
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <BackLink to="/players" label="All Players" />
 
       {/* Player header */}
       <div className="card p-6 mb-6">
         <div className="flex items-start gap-5">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-base-700 text-2xl font-bold text-slate-300">
-            {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
+          {player.photo_url ? (
+            <img
+              src={player.photo_url}
+              alt={player.name}
+              className="h-20 w-20 rounded-2xl object-cover bg-base-700"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-base-700 text-2xl font-bold text-slate-300">
+              {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-white">{player.name}</h1>
               <span
                 className="badge"
@@ -46,13 +66,18 @@ export default function PlayerDetail() {
               >
                 {player.position}
               </span>
+              {player.injured && (
+                <span className="badge bg-bad/10 text-bad border border-bad/20 flex items-center gap-1">
+                  <AlertCircle size={11} /> Injured
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-400">
               <span className="flex items-center gap-1.5"><Flag size={14} /> {player.nationality}</span>
               <span className="flex items-center gap-1.5"><Cake size={14} /> {player.age} years</span>
               {player.height_cm && <span className="flex items-center gap-1.5"><Ruler size={14} /> {player.height_cm}cm</span>}
               {player.weight_kg && <span className="flex items-center gap-1.5"><Weight size={14} /> {player.weight_kg}kg</span>}
-              <span className="text-slate-500">#{player.jersey_number}</span>
+              {player.jersey_number != null && <span className="text-slate-500">#{player.jersey_number}</span>}
             </div>
             {player.team && (
               <Link to={`/teams/${player.team.id}`} className="inline-flex items-center gap-2 mt-3 group">
@@ -61,10 +86,10 @@ export default function PlayerDetail() {
               </Link>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-right hidden sm:block">
             <p className="stat-label">Rating</p>
             <p className="font-mono text-4xl font-bold mt-1" style={{ color: ratingColor(player.rating) }}>
-              {player.rating.toFixed(1)}
+              {player.rating > 0 ? player.rating.toFixed(1) : "--"}
             </p>
           </div>
         </div>
@@ -76,11 +101,20 @@ export default function PlayerDetail() {
           <h2 className="text-lg font-semibold text-white mb-4">Season Stats</h2>
           <div className="space-y-4">
             <StatRow label="Appearances" value={player.appearances} />
+            <StatRow label="Minutes" value={player.minutes_played.toLocaleString()} />
             <StatRow label="Goals" value={player.goals} accent="#10B981" />
             <StatRow label="Assists" value={player.assists} accent="#00D4FF" />
-            <StatRow label="Goal Contributions" value={player.goals + player.assists} accent="#fbbf24" />
-            <StatRow label="Goals per Match" value={(player.goals / Math.max(player.appearances, 1)).toFixed(2)} />
-            <StatRow label="Minutes per Goal" value={player.goals > 0 ? Math.round((player.appearances * 90) / player.goals) : "—"} />
+            <StatRow label="Yellow Cards" value={player.yellow_cards} accent="#fbbf24" />
+            <StatRow label="Red Cards" value={player.red_cards} accent="#f87171" />
+            {isGK && (
+              <>
+                <StatRow label="Clean Sheets" value={player.clean_sheets} accent="#10B981" />
+                <StatRow label="Saves" value={player.saves} accent="#00D4FF" />
+              </>
+            )}
+            {!isGK && minPerGoal && (
+              <StatRow label="Min / Goal" value={minPerGoal} />
+            )}
           </div>
         </div>
 

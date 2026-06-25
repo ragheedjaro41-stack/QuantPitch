@@ -934,3 +934,66 @@ export function useApiFootballSummary() {
     },
   });
 }
+
+export function usePlayerSyncSummary() {
+  return useQuery({
+    queryKey: ["player-sync-summary"],
+    queryFn: async () => {
+      const [logsR, playersR, teamsR] = await Promise.all([
+        supabase
+          .from("api_football_sync_log")
+          .select("*")
+          .eq("sync_type", "players")
+          .order("started_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("players")
+          .select("id, team_id, external_id, league_id, name, position, goals, assists, appearances, rating"),
+        supabase
+          .from("teams")
+          .select("id, name, external_id, league_id")
+          .not("external_id", "is", null),
+      ]);
+
+      const logs = (logsR.data || []) as ApiFootballSyncLogRow[];
+      const players = (playersR.data || []) as Array<{
+        id: string; team_id: string; external_id: string | null; league_id: string | null;
+        name: string; position: string; goals: number; assists: number; appearances: number; rating: number;
+      }>;
+      const teams = (teamsR.data || []) as Array<{
+        id: string; name: string; external_id: string | null; league_id: string | null;
+      }>;
+
+      const realPlayers = players.filter((p) => p.external_id !== null);
+      const teamsWithPlayers = new Set(realPlayers.map((p) => p.team_id));
+      const teamsWithoutPlayers = teams.filter((t) => !teamsWithPlayers.has(t.id));
+
+      const duplicateCheck = new Map<string, number>();
+      for (const p of realPlayers) {
+        if (p.external_id) {
+          duplicateCheck.set(p.external_id, (duplicateCheck.get(p.external_id) || 0) + 1);
+        }
+      }
+      const duplicates = [...duplicateCheck.entries()].filter(([, c]) => c > 1).length;
+
+      return {
+        logs,
+        total_real_players: realPlayers.length,
+        total_demo_players: players.filter((p) => p.external_id === null).length,
+        teams_completed: teamsWithPlayers.size,
+        teams_missing: teamsWithoutPlayers,
+        total_synced_teams: teams.length,
+        duplicates,
+        top_scorers: [...realPlayers].sort((a, b) => b.goals - a.goals).slice(0, 5),
+        top_assists: [...realPlayers].sort((a, b) => b.assists - a.assists).slice(0, 5),
+        position_breakdown: {
+          GK: realPlayers.filter((p) => p.position === "GK").length,
+          DEF: realPlayers.filter((p) => p.position === "DEF").length,
+          MID: realPlayers.filter((p) => p.position === "MID").length,
+          FWD: realPlayers.filter((p) => p.position === "FWD").length,
+          SUB: realPlayers.filter((p) => p.position === "SUB").length,
+        },
+      };
+    },
+  });
+}

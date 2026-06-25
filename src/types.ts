@@ -19,7 +19,7 @@ export type Player = {
   team_id: string;
   name: string;
   position: string;
-  jersey_number: number;
+  jersey_number: number | null;
   nationality: string;
   age: number;
   height_cm: number | null;
@@ -27,9 +27,17 @@ export type Player = {
   goals: number;
   assists: number;
   appearances: number;
+  minutes_played: number;
+  yellow_cards: number;
+  red_cards: number;
+  clean_sheets: number;
+  saves: number;
   rating: number;
   photo_url: string | null;
+  injured: boolean;
   competition: string;
+  external_id: string | null;
+  league_id: string | null;
 };
 
 export type Match = {
