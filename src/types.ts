@@ -41,6 +41,7 @@ export type Match = {
   competition: string;
   stage: string | null;
   group_name: string | null;
+  league_id: string | null;
 };
 
 export type MatchEvent = {

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Shield, Users, Trophy, Target } from "lucide-react";
+import { Shield, Users, Trophy, Target, TrendingUp, Lock, CircleCheck as CheckCircle } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -10,12 +10,13 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { useDashboardStats } from "../lib/hooks";
+import { useDashboardStats, useTopPlays } from "../lib/hooks";
 import { PageHeader, StatCard, Spinner, ErrorState, TeamBadge } from "../components/ui";
 import { ratingColor } from "../lib/utils";
 
 export default function Dashboard() {
   const { data, isLoading, isError } = useDashboardStats();
+  const { data: topPlays, isLoading: playsLoading } = useTopPlays();
 
   if (isLoading) return <Spinner />;
   if (isError || !data) return <ErrorState message="Failed to load dashboard data" />;
@@ -104,6 +105,62 @@ export default function Dashboard() {
             <p className="text-xs text-slate-500 mt-1">out of 10.0</p>
           </div>
         </div>
+      </div>
+
+      {/* Top Plays — gated by live playability engine */}
+      <div className="card p-6 mt-6">
+        <div className="flex items-center gap-3 mb-1">
+          <TrendingUp size={18} className="text-accent" />
+          <h2 className="text-lg font-semibold text-white">Top Plays</h2>
+          <span className="ml-auto flex items-center gap-1 text-xs text-good">
+            <Lock size={11} /> Safety-gated · Tier-capped
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 mb-5">
+          Picks from playable leagues only — blocked by safety rules, confidence capped by tier
+        </p>
+        {playsLoading ? (
+          <Spinner />
+        ) : !topPlays || topPlays.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-6">No qualifying plays found in playable leagues</p>
+        ) : (
+          <div className="space-y-2">
+            {topPlays.slice(0, 6).map((play, i) => (
+              <Link
+                key={play.match_id}
+                to={`/matches/${play.match_id}`}
+                className="flex items-center gap-4 rounded-xl p-3 border border-base-700/40 hover:border-accent/20 hover:bg-base-700/30 transition-all group"
+              >
+                <span className="font-mono text-sm text-slate-500 w-5 shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate group-hover:text-accent transition-colors">
+                    {play.home_team_name} vs {play.away_team_name}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-slate-500">{play.league_short_name}</span>
+                    <span className="text-xs text-slate-600">·</span>
+                    <span className="text-xs text-slate-500">T{play.tier}</span>
+                    <span className="text-xs text-slate-600">·</span>
+                    <span className="text-xs text-slate-500">Odds {play.odds_coverage}% · Stats {play.stats_coverage}%</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <CheckCircle size={12} className="text-good" />
+                      <span className="text-sm font-bold text-white">{play.pick_label}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Cap {play.confidence_cap}%</p>
+                  </div>
+                  <div className="w-12 text-right">
+                    <p className="font-mono text-base font-bold text-accent">{play.value_score}</p>
+                    <p className="text-xs text-slate-600">score</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

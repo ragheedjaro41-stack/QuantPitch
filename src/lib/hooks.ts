@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
+import { getPlayableLeagueIds, classifyMatchCompetition } from "./playability";
+import type { PredictionRule } from "./adminHooks";
 import type {
   Team,
   Player,
@@ -444,6 +446,145 @@ export function useDashboardStats() {
         avgRating:
           players.reduce((sum, p) => sum + p.rating, 0) / players.length,
       };
+    },
+  });
+}
+
+export function useTopPlays() {
+  return useQuery({
+    queryKey: ["top-plays"],
+    queryFn: async () => {
+      // 1. Get live playable league IDs via safety rule evaluation
+      const playableLeagueIds = await getPlayableLeagueIds();
+
+      // 2. Load prediction rules for domestic league competition type
+      const { data: rulesData, error: re } = await supabase
+        .from("prediction_rules")
+        .select("*")
+        .eq("active", true)
+        .contains("competition_types", ["domestic_league"]);
+      if (re) throw re;
+      const predictionRules = rulesData as PredictionRule[];
+
+      // 3. Fetch upcoming/scheduled matches in playable leagues
+      const { data: matchesData, error: me } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("competition", "league")
+        .eq("status", "completed")
+        .not("league_id", "is", null)
+        .order("match_date", { ascending: false })
+        .limit(50);
+      if (me) throw me;
+      const matches = matchesData as Match[];
+
+      // 4. Filter to only matches in playable leagues
+      const playableMatches = matches.filter(
+        (m) => m.league_id && playableLeagueIds.has(m.league_id)
+      );
+
+      if (playableMatches.length === 0) return [];
+
+      // 5. Load leagues for playable matches
+      const leagueIds = [...new Set(playableMatches.map((m) => m.league_id!))];
+      const { data: leaguesData } = await supabase
+        .from("leagues")
+        .select("*")
+        .in("id", leagueIds);
+      const leagueMap = new Map((leaguesData || []).map((l) => [l.id, l]));
+
+      // 6. Load teams
+      const teamIds = new Set<string>();
+      playableMatches.forEach((m) => {
+        teamIds.add(m.home_team_id);
+        teamIds.add(m.away_team_id);
+      });
+      const { data: teamsData } = await supabase
+        .from("teams")
+        .select("id, name, short_name, primary_color")
+        .in("id", [...teamIds]);
+      const teamMap = new Map((teamsData || []).map((t) => [t.id, t]));
+
+      // 7. Build team form index (pts in last 5 matches)
+      const formPts = new Map<string, number>();
+      for (const tid of teamIds) {
+        const teamMatches = playableMatches
+          .filter((m) => m.home_team_id === tid || m.away_team_id === tid)
+          .slice(0, 5);
+        let pts = 0;
+        for (const m of teamMatches) {
+          const isHome = m.home_team_id === tid;
+          const scored = isHome ? m.home_score : m.away_score;
+          const conceded = isHome ? m.away_score : m.home_score;
+          if (scored > conceded) pts += 3;
+          else if (scored === conceded) pts += 1;
+        }
+        formPts.set(tid, pts);
+      }
+
+      // 8. Apply prediction rules: compute weight modifier per match
+      const getRuleModifier = (competitionTypes: string[]) => {
+        let modifier = 1.0;
+        for (const rule of predictionRules) {
+          const overlaps = rule.competition_types.some((ct) => competitionTypes.includes(ct));
+          if (overlaps) modifier *= rule.weight_modifier;
+        }
+        return modifier;
+      };
+
+      // 9. Score each match and pick the value play
+      const plays = playableMatches.slice(0, 10).map((m) => {
+        const league = leagueMap.get(m.league_id!);
+        const homeTeam = teamMap.get(m.home_team_id);
+        const awayTeam = teamMap.get(m.away_team_id);
+        const competitionTypes = classifyMatchCompetition(m);
+        const modifier = getRuleModifier(competitionTypes);
+
+        const homeForm = formPts.get(m.home_team_id) ?? 0;
+        const awayForm = formPts.get(m.away_team_id) ?? 0;
+        const homeAdv = 1.15; // home field factor
+        const homeScore = homeForm * homeAdv * modifier;
+        const awayScore = awayForm * modifier;
+        const diff = homeScore - awayScore;
+
+        let pick: "home" | "away" | "draw";
+        let pickLabel: string;
+        if (Math.abs(diff) < 2) { pick = "draw"; pickLabel = "Draw"; }
+        else if (diff > 0) { pick = "home"; pickLabel = homeTeam?.short_name ?? "Home"; }
+        else { pick = "away"; pickLabel = awayTeam?.short_name ?? "Away"; }
+
+        const tierCap = league ? (league.tier === 1 ? 95 : league.tier === 2 ? 85 : 70) : 70;
+        const rawConfidence = Math.min(60 + Math.abs(diff) * 3, 100);
+        const confidence = Math.min(rawConfidence, tierCap);
+        const oddsCov = league?.odds_coverage ?? 0;
+        const statsCov = league?.stats_coverage ?? 0;
+        const valueScore = Math.round(confidence * (oddsCov / 100) * (statsCov / 100) * modifier * 100);
+
+        return {
+          match_id: m.id,
+          home_team_name: homeTeam?.name ?? "Unknown",
+          away_team_name: awayTeam?.name ?? "Unknown",
+          home_team_id: m.home_team_id,
+          away_team_id: m.away_team_id,
+          match_date: m.match_date,
+          venue: m.venue,
+          league_id: m.league_id!,
+          league_name: league?.name ?? "Unknown",
+          league_short_name: league?.short_name ?? "?",
+          tier: league?.tier ?? 0,
+          competition_type: league?.competition_type ?? "domestic_league",
+          odds_coverage: oddsCov,
+          stats_coverage: statsCov,
+          confidence_cap: tierCap,
+          pick,
+          pick_label: pickLabel,
+          value_score: valueScore,
+          home_form_pts: homeForm,
+          away_form_pts: awayForm,
+        };
+      });
+
+      return plays.sort((a, b) => b.value_score - a.value_score);
     },
   });
 }
