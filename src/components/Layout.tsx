@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks } from "lucide-react";
+import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale } from "lucide-react";
 
 const mainNav = [
   { to: "/",          label: "Dashboard",  icon: LayoutDashboard, end: true },
@@ -24,6 +24,7 @@ const adminNav = [
   { to: "/admin/alias-queue",          label: "Alias Queue",     icon: Tag },
   { to: "/admin/odds-monitor",          label: "Odds Monitor",    icon: Radio },
   { to: "/admin/provider-setup",       label: "Provider Setup",  icon: Key },
+  { to: "/admin/settlement",            label: "Settlement",      icon: Scale },
   { to: "/admin/activation",            label: "Activation",      icon: ListChecks },
   { to: "/admin/certification",        label: "Certification",   icon: BadgeCheck },
 ];

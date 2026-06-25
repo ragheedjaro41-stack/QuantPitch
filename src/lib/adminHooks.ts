@@ -606,3 +606,139 @@ export function useTrustedMarkets() {
     },
   });
 }
+
+// ============================================================
+// SETTLEMENT
+// ============================================================
+
+export type MatchResultRow = {
+  id: string;
+  match_id: string;
+  ft_home: number;
+  ft_away: number;
+  ht_home: number | null;
+  ht_away: number | null;
+  et_home: number | null;
+  et_away: number | null;
+  pen_home: number | null;
+  pen_away: number | null;
+  went_to_et: boolean;
+  went_to_penalties: boolean;
+  match_status: string;
+  competition_type: string;
+  provider_source: string | null;
+  confirmed_at: string;
+  notes: string | null;
+};
+
+export type SettlementLogRow = {
+  id: string;
+  match_id: string;
+  match_result_id: string;
+  market_key: string;
+  outcome: string;
+  status: string;
+  reason: string;
+  settled_at: string;
+};
+
+export function useMatchResults(limit = 50) {
+  return useQuery({
+    queryKey: ["match-results", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("match_results")
+        .select("*")
+        .order("confirmed_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as MatchResultRow[];
+    },
+  });
+}
+
+export function useSettlementLog(limit = 100) {
+  return useQuery({
+    queryKey: ["settlement-log", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("settlement_log")
+        .select("*")
+        .order("settled_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as SettlementLogRow[];
+    },
+  });
+}
+
+export function usePendingSettlementMatches() {
+  return useQuery({
+    queryKey: ["pending-settlement-matches"],
+    queryFn: async () => {
+      const [matchesR, resultsR, teamsR] = await Promise.all([
+        supabase.from("matches").select("id, home_team_id, away_team_id, match_date, status, league_id, competition").eq("status", "completed").order("match_date", { ascending: false }),
+        supabase.from("match_results").select("match_id"),
+        supabase.from("teams").select("id, name"),
+      ]);
+      if (matchesR.error) throw matchesR.error;
+
+      const settledSet = new Set((resultsR.data || []).map((r: { match_id: string }) => r.match_id));
+      const teamMap = new Map((teamsR.data || []).map((t: { id: string; name: string }) => [t.id, t.name]));
+
+      const pending = (matchesR.data || [])
+        .filter((m: { id: string }) => !settledSet.has(m.id))
+        .map((m: any) => ({
+          ...m,
+          home_team_name: teamMap.get(m.home_team_id) || "Unknown",
+          away_team_name: teamMap.get(m.away_team_id) || "Unknown",
+        }));
+
+      return { pending, totalSettled: settledSet.size };
+    },
+  });
+}
+
+export function useSettlementSummary() {
+  return useQuery({
+    queryKey: ["settlement-summary"],
+    queryFn: async () => {
+      const [resultsR, logsR] = await Promise.all([
+        supabase.from("match_results").select("id, match_status"),
+        supabase.from("settlement_log").select("id, market_key, status"),
+      ]);
+
+      const results = (resultsR.data || []) as Array<{ id: string; match_status: string }>;
+      const logs = (logsR.data || []) as Array<{ id: string; market_key: string; status: string }>;
+
+      const confirmed = results.filter((r) => r.match_status === "confirmed").length;
+      const voided = results.filter((r) => ["postponed", "cancelled", "abandoned", "void"].includes(r.match_status)).length;
+      const review = results.filter((r) => r.match_status === "pending_review").length;
+
+      const settled = logs.filter((l) => l.status === "settled").length;
+      const voidLogs = logs.filter((l) => l.status === "void").length;
+      const errorLogs = logs.filter((l) => l.status === "error").length;
+
+      const marketMap = new Map<string, { settled: number; void: number; error: number }>();
+      for (const l of logs) {
+        if (!marketMap.has(l.market_key)) marketMap.set(l.market_key, { settled: 0, void: 0, error: 0 });
+        const e = marketMap.get(l.market_key)!;
+        if (l.status === "settled") e.settled++;
+        else if (l.status === "void") e.void++;
+        else e.error++;
+      }
+
+      return {
+        total_results: results.length,
+        confirmed,
+        voided,
+        review,
+        total_logs: logs.length,
+        settled,
+        voidLogs,
+        errorLogs,
+        by_market: [...marketMap.entries()].map(([k, v]) => ({ market_key: k, ...v })),
+      };
+    },
+  });
+}

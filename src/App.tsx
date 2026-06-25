@@ -25,6 +25,7 @@ import Certification from "./pages/admin/Certification";
 import OddsMonitor from "./pages/admin/OddsMonitor";
 import ProviderSetup from "./pages/admin/ProviderSetup";
 import ActivationChecklist from "./pages/admin/ActivationChecklist";
+import Settlement from "./pages/admin/Settlement";
 
 export default function App() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="admin/odds-monitor" element={<OddsMonitor />} />
         <Route path="admin/provider-setup" element={<ProviderSetup />} />
         <Route path="admin/activation" element={<ActivationChecklist />} />
+        <Route path="admin/settlement" element={<Settlement />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
