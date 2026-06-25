@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { computeLeaguePlayability, classifyMatchCompetition } from "../lib/playability";
 import type { League, SafetyRule, DataCoverage } from "../lib/adminHooks";
 
-function makeLeague(overrides: Partial<League> = {}): League {
+function makeLeague(overrides: Partial<League & { is_synthetic?: boolean; has_live_odds?: boolean }> = {}): League & { is_synthetic: boolean; has_live_odds: boolean } {
   return {
     id: "league-1",
     name: "Test League",
@@ -29,6 +29,9 @@ function makeLeague(overrides: Partial<League> = {}): League {
     notes: null,
     logo_url: null,
     created_at: "2026-01-01T00:00:00Z",
+    // Default to has_live_odds=true so old tests remain valid (simulating a connected league)
+    is_synthetic: false,
+    has_live_odds: true,
     ...overrides,
   };
 }

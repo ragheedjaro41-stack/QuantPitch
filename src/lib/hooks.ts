@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
-import { getPlayableLeagueIds, classifyMatchCompetition } from "./playability";
+import { getAllLeaguePlayability, classifyMatchCompetition, buildCupContext, cupWeightModifier } from "./playability";
+import type { PlayabilityResult, TopPlay } from "./playability";
 import type { PredictionRule } from "./adminHooks";
 import type {
   Team,
@@ -454,10 +455,10 @@ export function useTopPlays() {
   return useQuery({
     queryKey: ["top-plays"],
     queryFn: async () => {
-      // 1. Get live playable league IDs via safety rule evaluation
-      const playableLeagueIds = await getPlayableLeagueIds();
+      // 1. Evaluate live playability for all leagues (picks status + safety rules + coverage)
+      const leaguePlayability = await getAllLeaguePlayability();
 
-      // 2. Load prediction rules for domestic league competition type
+      // 2. Load prediction rules
       const { data: rulesData, error: re } = await supabase
         .from("prediction_rules")
         .select("*")
@@ -466,49 +467,54 @@ export function useTopPlays() {
       if (re) throw re;
       const predictionRules = rulesData as PredictionRule[];
 
-      // 3. Fetch upcoming/scheduled matches in playable leagues
+      // 3. Fetch recent matches (all competitions, we'll hard-filter below)
       const { data: matchesData, error: me } = await supabase
         .from("matches")
         .select("*")
-        .eq("competition", "league")
         .eq("status", "completed")
         .not("league_id", "is", null)
         .order("match_date", { ascending: false })
-        .limit(50);
+        .limit(100);
       if (me) throw me;
-      const matches = matchesData as Match[];
+      const allMatches = matchesData as Match[];
 
-      // 4. Filter to only matches in playable leagues
-      const playableMatches = matches.filter(
-        (m) => m.league_id && playableLeagueIds.has(m.league_id)
-      );
+      // 4. Hard safety gate: only LIVE_PICK leagues pass
+      // Block: synthetic/demo, no live odds, blocked by safety rules, Tier 4, missing settlement
+      const liveMatches = allMatches.filter((m) => {
+        if (!m.league_id) return false;
+        const playability = leaguePlayability.get(m.league_id);
+        if (!playability) return false;
+        // Must be LIVE_PICK to appear in Top Plays
+        if (playability.pick_status !== "LIVE_PICK") return false;
+        // Hard block Tier 4
+        if (playability.tier >= 4) return false;
+        return true;
+      });
 
-      if (playableMatches.length === 0) return [];
+      // 5. Load leagues for qualifying matches
+      const leagueIds = [...new Set(liveMatches.map((m) => m.league_id!))];
+      const leagueMap = new Map<string, any>();
+      if (leagueIds.length > 0) {
+        const { data: leaguesData } = await supabase
+          .from("leagues")
+          .select("*")
+          .in("id", leagueIds);
+        (leaguesData || []).forEach((l) => leagueMap.set(l.id, l));
+      }
 
-      // 5. Load leagues for playable matches
-      const leagueIds = [...new Set(playableMatches.map((m) => m.league_id!))];
-      const { data: leaguesData } = await supabase
-        .from("leagues")
-        .select("*")
-        .in("id", leagueIds);
-      const leagueMap = new Map((leaguesData || []).map((l) => [l.id, l]));
+      if (liveMatches.length === 0) return [] as TopPlay[];
 
       // 6. Load teams
       const teamIds = new Set<string>();
-      playableMatches.forEach((m) => {
-        teamIds.add(m.home_team_id);
-        teamIds.add(m.away_team_id);
-      });
+      liveMatches.forEach((m) => { teamIds.add(m.home_team_id); teamIds.add(m.away_team_id); });
       const { data: teamsData } = await supabase
-        .from("teams")
-        .select("id, name, short_name, primary_color")
-        .in("id", [...teamIds]);
+        .from("teams").select("id, name, short_name, primary_color").in("id", [...teamIds]);
       const teamMap = new Map((teamsData || []).map((t) => [t.id, t]));
 
-      // 7. Build team form index (pts in last 5 matches)
+      // 7. Build team form index (pts in last 5 games)
       const formPts = new Map<string, number>();
       for (const tid of teamIds) {
-        const teamMatches = playableMatches
+        const teamMatches = liveMatches
           .filter((m) => m.home_team_id === tid || m.away_team_id === tid)
           .slice(0, 5);
         let pts = 0;
@@ -522,43 +528,62 @@ export function useTopPlays() {
         formPts.set(tid, pts);
       }
 
-      // 8. Apply prediction rules: compute weight modifier per match
+      // 8. Prediction rule weight modifier by competition types
       const getRuleModifier = (competitionTypes: string[]) => {
         let modifier = 1.0;
         for (const rule of predictionRules) {
-          const overlaps = rule.competition_types.some((ct) => competitionTypes.includes(ct));
-          if (overlaps) modifier *= rule.weight_modifier;
+          if (rule.competition_types.some((ct: string) => competitionTypes.includes(ct))) {
+            modifier *= rule.weight_modifier;
+          }
         }
         return modifier;
       };
 
-      // 9. Score each match and pick the value play
-      const plays = playableMatches.slice(0, 10).map((m) => {
+      // 9. Score each match, apply cup context where applicable
+      const plays: TopPlay[] = liveMatches.slice(0, 15).map((m) => {
         const league = leagueMap.get(m.league_id!);
+        const playability = leaguePlayability.get(m.league_id!) as PlayabilityResult;
         const homeTeam = teamMap.get(m.home_team_id);
         const awayTeam = teamMap.get(m.away_team_id);
+
         const competitionTypes = classifyMatchCompetition(m);
-        const modifier = getRuleModifier(competitionTypes);
+        const isCup = competitionTypes.includes("cup") || competitionTypes.includes("knockout");
+
+        // Cup context (null for regular league games)
+        const cupCtx = isCup
+          ? buildCupContext({ stage: m.stage, leg: undefined, is_neutral_venue: undefined })
+          : null;
+        const cupMod = cupCtx ? cupWeightModifier(cupCtx) : 1.0;
+        const ruleModifier = getRuleModifier(competitionTypes);
+        const totalModifier = ruleModifier * cupMod;
 
         const homeForm = formPts.get(m.home_team_id) ?? 0;
         const awayForm = formPts.get(m.away_team_id) ?? 0;
-        const homeAdv = 1.15; // home field factor
-        const homeScore = homeForm * homeAdv * modifier;
-        const awayScore = awayForm * modifier;
+        const homeAdv = cupCtx?.is_neutral_venue ? 1.0 : 1.15;
+        const homeScore = homeForm * homeAdv * totalModifier;
+        const awayScore = awayForm * totalModifier;
         const diff = homeScore - awayScore;
 
+        // Pressure in finals/semis increases draw probability
+        const drawThreshold = cupCtx?.pressure_flag ? 3 : 2;
         let pick: "home" | "away" | "draw";
         let pickLabel: string;
-        if (Math.abs(diff) < 2) { pick = "draw"; pickLabel = "Draw"; }
+        if (Math.abs(diff) < drawThreshold) { pick = "draw"; pickLabel = "Draw"; }
         else if (diff > 0) { pick = "home"; pickLabel = homeTeam?.short_name ?? "Home"; }
         else { pick = "away"; pickLabel = awayTeam?.short_name ?? "Away"; }
 
-        const tierCap = league ? (league.tier === 1 ? 95 : league.tier === 2 ? 85 : 70) : 70;
+        const tierCap = playability.confidence_cap ?? 70;
         const rawConfidence = Math.min(60 + Math.abs(diff) * 3, 100);
         const confidence = Math.min(rawConfidence, tierCap);
         const oddsCov = league?.odds_coverage ?? 0;
         const statsCov = league?.stats_coverage ?? 0;
-        const valueScore = Math.round(confidence * (oddsCov / 100) * (statsCov / 100) * modifier * 100);
+
+        // LIVE_PICK: value score uses real odds/stats coverage
+        // NOTE: since no real odds feed exists yet, oddsCov will be 0 for all leagues
+        // and LIVE_PICK leagues will not appear until has_live_odds=true is set on the league
+        const valueScore = Math.round(
+          confidence * (Math.max(oddsCov, 1) / 100) * (Math.max(statsCov, 1) / 100) * totalModifier * 100
+        );
 
         return {
           match_id: m.id,
@@ -571,17 +596,19 @@ export function useTopPlays() {
           league_id: m.league_id!,
           league_name: league?.name ?? "Unknown",
           league_short_name: league?.short_name ?? "?",
-          tier: league?.tier ?? 0,
+          tier: playability.tier,
           competition_type: league?.competition_type ?? "domestic_league",
           odds_coverage: oddsCov,
           stats_coverage: statsCov,
           confidence_cap: tierCap,
           pick,
           pick_label: pickLabel,
+          pick_status: playability.pick_status,
           value_score: valueScore,
           home_form_pts: homeForm,
           away_form_pts: awayForm,
-        };
+          cup_context: cupCtx,
+        } satisfies TopPlay;
       });
 
       return plays.sort((a, b) => b.value_score - a.value_score);

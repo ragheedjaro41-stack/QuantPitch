@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag } from "lucide-react";
 
 const mainNav = [
   { to: "/",          label: "Dashboard",  icon: LayoutDashboard, end: true },
@@ -21,6 +21,7 @@ const adminNav = [
   { to: "/admin/teams",                label: "Teams",           icon: Shield },
   { to: "/admin/promotion-relegation", label: "P/R Tracker",     icon: ArrowUpDown },
   { to: "/admin/audit",                label: "Audit Report",    icon: ClipboardList },
+  { to: "/admin/alias-queue",          label: "Alias Queue",     icon: Tag },
 ];
 
 export default function Layout() {

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Shield, Users, Trophy, Target, TrendingUp, Lock, CircleCheck as CheckCircle } from "lucide-react";
+import { Shield, Users, Trophy, Target, TrendingUp, Lock, Radio, CircleAlert as AlertCircle } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -112,53 +112,70 @@ export default function Dashboard() {
         <div className="flex items-center gap-3 mb-1">
           <TrendingUp size={18} className="text-accent" />
           <h2 className="text-lg font-semibold text-white">Top Plays</h2>
-          <span className="ml-auto flex items-center gap-1 text-xs text-good">
-            <Lock size={11} /> Safety-gated · Tier-capped
+          <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
+            <Lock size={11} /> LIVE_PICK only · Safety-gated · Tier-capped
           </span>
         </div>
-        <p className="text-xs text-slate-400 mb-5">
-          Picks from playable leagues only — blocked by safety rules, confidence capped by tier
+        <p className="text-xs text-slate-400 mb-2">
+          Only leagues with <span className="text-good font-semibold">LIVE_PICK</span> status appear here.
+          DEMO and BLOCKED leagues are excluded.
         </p>
+        <div className="flex items-center gap-2 mb-5 p-3 rounded-xl bg-warn/5 border border-warn/20">
+          <AlertCircle size={13} className="text-warn shrink-0" />
+          <p className="text-xs text-warn">
+            No live odds feed connected — all leagues currently show BLOCKED_PICK or DEMO_PICK.
+            Connect a real odds provider and set <code className="text-xs bg-base-700/60 px-1 rounded">has_live_odds=true</code> on a league to activate LIVE_PICK.
+          </p>
+        </div>
         {playsLoading ? (
           <Spinner />
         ) : !topPlays || topPlays.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-6">No qualifying plays found in playable leagues</p>
+          <div className="text-center py-8">
+            <Radio size={28} className="text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-400">No live picks available</p>
+            <p className="text-xs text-slate-600 mt-1">Activate a league with a live odds feed to see picks here</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {topPlays.slice(0, 6).map((play, i) => (
-              <Link
-                key={play.match_id}
-                to={`/matches/${play.match_id}`}
-                className="flex items-center gap-4 rounded-xl p-3 border border-base-700/40 hover:border-accent/20 hover:bg-base-700/30 transition-all group"
-              >
-                <span className="font-mono text-sm text-slate-500 w-5 shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate group-hover:text-accent transition-colors">
-                    {play.home_team_name} vs {play.away_team_name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs text-slate-500">{play.league_short_name}</span>
-                    <span className="text-xs text-slate-600">·</span>
-                    <span className="text-xs text-slate-500">T{play.tier}</span>
-                    <span className="text-xs text-slate-600">·</span>
-                    <span className="text-xs text-slate-500">Odds {play.odds_coverage}% · Stats {play.stats_coverage}%</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <CheckCircle size={12} className="text-good" />
-                      <span className="text-sm font-bold text-white">{play.pick_label}</span>
+            {topPlays.slice(0, 6).map((play, i) => {
+              const statusCfg = {
+                LIVE_PICK: { cls: "bg-good/10 text-good border-good/20", label: "LIVE" },
+                DEMO_PICK: { cls: "bg-warn/10 text-warn border-warn/20", label: "DEMO" },
+                BLOCKED_PICK: { cls: "bg-slate-700/50 text-slate-500 border-slate-600", label: "BLOCKED" },
+              }[play.pick_status];
+              return (
+                <Link
+                  key={play.match_id}
+                  to={`/matches/${play.match_id}`}
+                  className="flex items-center gap-4 rounded-xl p-3 border border-base-700/40 hover:border-accent/20 hover:bg-base-700/30 transition-all group"
+                >
+                  <span className="font-mono text-sm text-slate-500 w-5 shrink-0">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate group-hover:text-accent transition-colors">
+                      {play.home_team_name} vs {play.away_team_name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold border ${statusCfg.cls}`}>
+                        {statusCfg.label}
+                      </span>
+                      <span className="text-xs text-slate-500">{play.league_short_name}</span>
+                      <span className="text-xs text-slate-600">·</span>
+                      <span className="text-xs text-slate-500">T{play.tier}</span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">Cap {play.confidence_cap}%</p>
                   </div>
-                  <div className="w-12 text-right">
-                    <p className="font-mono text-base font-bold text-accent">{play.value_score}</p>
-                    <p className="text-xs text-slate-600">score</p>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-white">{play.pick_label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Cap {play.confidence_cap}%</p>
+                    </div>
+                    <div className="w-12 text-right">
+                      <p className="font-mono text-base font-bold text-accent">{play.value_score}</p>
+                      <p className="text-xs text-slate-600">score</p>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
