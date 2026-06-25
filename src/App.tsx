@@ -26,6 +26,7 @@ import OddsMonitor from "./pages/admin/OddsMonitor";
 import ProviderSetup from "./pages/admin/ProviderSetup";
 import ActivationChecklist from "./pages/admin/ActivationChecklist";
 import Settlement from "./pages/admin/Settlement";
+import ApiFootball from "./pages/admin/ApiFootball";
 
 export default function App() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="admin/provider-setup" element={<ProviderSetup />} />
         <Route path="admin/activation" element={<ActivationChecklist />} />
         <Route path="admin/settlement" element={<Settlement />} />
+        <Route path="admin/api-football" element={<ApiFootball />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

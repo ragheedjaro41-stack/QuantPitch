@@ -795,3 +795,142 @@ export function useResultsSyncCooldown() {
     },
   });
 }
+
+// ============================================================
+// API-FOOTBALL SYNC
+// ============================================================
+
+export type ApiFootballSyncLogRow = {
+  id: string;
+  sync_type: string;
+  provider: string;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  synced_count: number;
+  skipped_count: number;
+  error_count: number;
+  error_message: string | null;
+  league_filter: string | null;
+  meta: Record<string, unknown> | null;
+};
+
+export type ProviderMissingDataRow = {
+  id: string;
+  provider: string;
+  entity_type: string;
+  entity_ref: string;
+  league_id: string | null;
+  reason: string;
+  first_seen_at: string;
+  last_checked_at: string;
+  resolved: boolean;
+};
+
+export function useApiFootballSyncLog(limit = 20) {
+  return useQuery({
+    queryKey: ["api-football-sync-log", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("api_football_sync_log")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as ApiFootballSyncLogRow[];
+    },
+  });
+}
+
+export function useApiFootballSyncCooldown(syncType: string) {
+  return useQuery({
+    queryKey: ["api-football-cooldown", syncType],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("api_football_sync_log")
+        .select("id, started_at")
+        .eq("sync_type", syncType)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return { onCooldown: false, remaining: 0 };
+      const elapsed = (Date.now() - new Date(data.started_at).getTime()) / 1000;
+      const remaining = Math.max(0, Math.ceil(120 - elapsed));
+      return { onCooldown: remaining > 0, remaining };
+    },
+  });
+}
+
+export function useProviderMissingData() {
+  return useQuery({
+    queryKey: ["provider-missing-data"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("provider_missing_data")
+        .select("*")
+        .eq("resolved", false)
+        .order("last_checked_at", { ascending: false });
+      if (error) throw error;
+      return data as ProviderMissingDataRow[];
+    },
+  });
+}
+
+export function useApiFootballSummary() {
+  return useQuery({
+    queryKey: ["api-football-summary"],
+    queryFn: async () => {
+      const [logsR, missingR, teamsR, matchesR] = await Promise.all([
+        supabase
+          .from("api_football_sync_log")
+          .select("sync_type, status, synced_count, error_count")
+          .order("started_at", { ascending: false })
+          .limit(50),
+        supabase
+          .from("provider_missing_data")
+          .select("entity_type, resolved")
+          .eq("resolved", false),
+        supabase
+          .from("teams")
+          .select("id, external_id"),
+        supabase
+          .from("matches")
+          .select("id, external_id"),
+      ]);
+
+      const logs = (logsR.data || []) as Array<{ sync_type: string; status: string; synced_count: number; error_count: number }>;
+
+      const byType = (type: string) => {
+        const typeLogs = logs.filter((l) => l.sync_type === type);
+        return {
+          total_syncs: typeLogs.length,
+          total_synced: typeLogs.reduce((s, l) => s + l.synced_count, 0),
+          total_errors: typeLogs.reduce((s, l) => s + l.error_count, 0),
+          last_status: typeLogs[0]?.status || "never",
+        };
+      };
+
+      const missing = (missingR.data || []) as Array<{ entity_type: string; resolved: boolean }>;
+      const teams = (teamsR.data || []) as Array<{ id: string; external_id: string | null }>;
+      const matches = (matchesR.data || []) as Array<{ id: string; external_id: string | null }>;
+
+      return {
+        fixtures: byType("fixtures"),
+        teams: byType("teams"),
+        standings: byType("standings"),
+        missing_data_count: missing.length,
+        missing_by_type: {
+          standings: missing.filter((m) => m.entity_type === "standings").length,
+          stats: missing.filter((m) => m.entity_type === "stats").length,
+          fixtures: missing.filter((m) => m.entity_type === "fixtures").length,
+        },
+        linked_teams: teams.filter((t) => t.external_id).length,
+        total_teams: teams.length,
+        linked_matches: matches.filter((m) => m.external_id).length,
+        total_matches: matches.length,
+      };
+    },
+  });
+}
