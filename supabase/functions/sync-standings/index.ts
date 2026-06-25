@@ -161,16 +161,25 @@ Deno.serve(async (req: Request) => {
         .map((t: { id: string; external_id: string }) => [t.external_id, t.id])
     );
 
-    // Find DB league
+    // Map API-Football league IDs to DB league names
+    const API_LEAGUE_NAMES: Record<number, string> = {
+      39: "Premier League", 140: "La Liga", 135: "Serie A", 78: "Bundesliga",
+      61: "Ligue 1", 94: "Primeira Liga", 88: "Eredivisie", 144: "Belgian Pro League",
+      203: "Süper Lig", 235: "Russian Premier League", 253: "MLS", 262: "Liga MX",
+    };
+    const expectedName = API_LEAGUE_NAMES[leagueId];
+
     const { data: dbLeagues } = await supabase
       .from("leagues")
-      .select("id, name");
+      .select("id, name")
+      .eq("is_synthetic", false);
     let dbLeagueId: string | null = null;
-    const matched = (dbLeagues || []).find((l: { name: string }) => {
-      const ln = l.name.toLowerCase();
-      return ln.includes("premier") || ln.includes("epl");
-    });
-    if (matched) dbLeagueId = (matched as { id: string }).id;
+    if (expectedName) {
+      const exact = (dbLeagues || []).find(
+        (l: { name: string }) => l.name === expectedName
+      );
+      if (exact) dbLeagueId = (exact as { id: string }).id;
+    }
 
     let standingsSynced = 0;
     let statsSynced = 0;

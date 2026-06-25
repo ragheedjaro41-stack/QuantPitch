@@ -123,8 +123,16 @@ Deno.serve(async (req: Request) => {
         .eq("id", logId);
     };
 
-    // ── 3. Check for odds provider API key ──
-    const oddsApiKey = Deno.env.get("ODDS_API_KEY");
+    // ── 3. Check for odds provider API key (env secret first, then DB fallback) ──
+    let oddsApiKey = Deno.env.get("ODDS_API_KEY");
+    if (!oddsApiKey) {
+      const { data: cfgRow } = await supabase
+        .from("app_config")
+        .select("value")
+        .eq("key", "ODDS_API_KEY")
+        .maybeSingle();
+      if (cfgRow?.value) oddsApiKey = cfgRow.value;
+    }
     if (!oddsApiKey) {
       await supabase
         .from("odds_providers")
