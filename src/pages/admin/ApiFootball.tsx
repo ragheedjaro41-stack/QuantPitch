@@ -454,7 +454,7 @@ export default function ApiFootball() {
                       className="text-xs font-bold"
                       style={{ color: statusColor(l.status) }}
                     >
-                      {l.status.toUpperCase()}
+                      {(l.status || "").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">

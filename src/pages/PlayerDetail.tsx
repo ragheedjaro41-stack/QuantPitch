@@ -62,7 +62,7 @@ export default function PlayerDetail() {
             />
           ) : (
             <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-base-700 text-2xl font-bold text-slate-300 shrink-0">
-              {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              {(player.name || "?").split(" ").map((n) => n[0]).join("").slice(0, 2)}
             </div>
           )}
           <div className="flex-1 min-w-0">

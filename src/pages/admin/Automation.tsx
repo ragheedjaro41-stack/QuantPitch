@@ -242,7 +242,7 @@ export default function Automation() {
 
       {/* Cron reference table */}
       <h2 className="text-sm font-bold text-white mb-3">Recommended Cron Schedule</h2>
-      <div className="card overflow-hidden mb-8 overflow-x-auto">
+      <div className="card mb-8 overflow-x-auto">
         <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">

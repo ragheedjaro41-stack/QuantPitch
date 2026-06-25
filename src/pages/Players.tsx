@@ -200,7 +200,7 @@ function PlayerCard({ player, sortBy }: { player: PlayerWithTeam; sortBy: SortKe
           />
         ) : (
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-base-700 text-sm font-semibold text-slate-300">
-            {player.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+            {(player.name || "?").split(" ").map((n) => n[0]).join("").slice(0, 2)}
           </div>
         )}
         <div className="flex-1 min-w-0">

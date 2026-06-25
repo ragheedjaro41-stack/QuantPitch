@@ -154,7 +154,7 @@ export default function CupFixtures() {
                     )}
                     {f.winner_name && (
                       <span className="flex items-center gap-1 text-xs text-good">
-                        <CheckCircle size={10} /> {f.winner_name.split(" ").slice(-1)[0]}
+                        <CheckCircle size={10} /> {(f.winner_name || "").split(" ").slice(-1)[0] || "—"}
                       </span>
                     )}
                   </div>

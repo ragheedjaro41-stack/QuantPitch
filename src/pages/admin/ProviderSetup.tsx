@@ -145,7 +145,7 @@ export default function ProviderSetup() {
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs font-bold" style={{ color: statusColor }}>
-                      {p.status.toUpperCase()}
+                      {(p.status || "").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
@@ -221,7 +221,7 @@ export default function ProviderSetup() {
               className="text-xs font-bold"
               style={{ color: theOddsApi?.status === "active" ? "#10B981" : "#64748b" }}
             >
-              {theOddsApi?.status.toUpperCase() ?? "UNKNOWN"}
+              {(theOddsApi?.status || "").toUpperCase() || "UNKNOWN"}
             </span>
           </div>
         </div>

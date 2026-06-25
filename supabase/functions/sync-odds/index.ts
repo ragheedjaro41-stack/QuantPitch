@@ -191,7 +191,6 @@ Deno.serve(async (req: Request) => {
 
         return jsonResponse({
           error: `Odds API returned ${apiRes.status}`,
-          detail: errText.slice(0, 200),
           synced: 0,
           live_odds_changed: false,
           provider_status: "error",

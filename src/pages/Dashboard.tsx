@@ -273,7 +273,7 @@ function PlayerRankingCard({
                 <img src={p.photo_url} alt="" className="h-8 w-8 rounded-lg object-cover bg-base-700" loading="lazy" />
               ) : (
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-base-700 text-[10px] font-semibold text-slate-400">
-                  {p.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  {(p.name || "?").split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </div>
               )}
               <div className="flex-1 min-w-0">

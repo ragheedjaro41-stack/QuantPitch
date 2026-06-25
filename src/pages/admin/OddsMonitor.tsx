@@ -188,7 +188,7 @@ export default function OddsMonitor() {
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500">Status</span>
-                  <span className="text-xs font-bold" style={{ color: statusColor }}>{p.status.toUpperCase()}</span>
+                  <span className="text-xs font-bold" style={{ color: statusColor }}>{(p.status || "").toUpperCase()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500">Last Success</span>
@@ -313,7 +313,7 @@ export default function OddsMonitor() {
                       <span className="text-xs text-slate-400">{new Date(entry.started_at).toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-2.5">
-                      <span className="text-xs font-bold" style={{ color: statusColor }}>{entry.status.toUpperCase()}</span>
+                      <span className="text-xs font-bold" style={{ color: statusColor }}>{(entry.status || "").toUpperCase()}</span>
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs font-mono text-white">{entry.synced_count}</span>

@@ -239,7 +239,7 @@ export default function Settlement() {
               className="text-sm font-bold"
               style={{ color: lastSync ? statusColor(lastSync.status) : "#64748b" }}
             >
-              {lastSync ? lastSync.status.toUpperCase() : "N/A"}
+              {lastSync ? (lastSync.status || "").toUpperCase() : "N/A"}
             </p>
           </div>
           <div>
@@ -381,7 +381,7 @@ export default function Settlement() {
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs font-bold" style={{ color: statusColor(l.status) }}>
-                      {l.status.toUpperCase()}
+                      {(l.status || "").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
@@ -548,7 +548,7 @@ export default function Settlement() {
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs font-bold" style={{ color: statusColor(r.match_status) }}>
-                        {r.match_status.toUpperCase()}
+                        {(r.match_status || "").toUpperCase()}
                       </span>
                     </td>
                     <td className="px-4 py-2.5">
@@ -658,12 +658,12 @@ export default function Settlement() {
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs font-bold" style={{ color: outcomeColor(l.outcome) }}>
-                      {l.outcome.toUpperCase()}
+                      {(l.outcome || "").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs font-bold" style={{ color: statusColor(l.status) }}>
-                      {l.status.toUpperCase()}
+                      {(l.status || "").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">

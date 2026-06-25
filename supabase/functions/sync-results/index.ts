@@ -184,7 +184,6 @@ Deno.serve(async (req: Request) => {
         });
         return jsonResponse({
           error: `API-Football returned ${apiRes.status}`,
-          detail: errText.slice(0, 300),
           synced: 0,
           settled: 0,
           provider_status: "error",
