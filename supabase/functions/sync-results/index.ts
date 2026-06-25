@@ -191,6 +191,23 @@ Deno.serve(async (req: Request) => {
         });
       }
       const json = await apiRes.json();
+
+      // API-Football wraps errors in the response body, not HTTP status
+      if (json.errors && Object.keys(json.errors).length > 0) {
+        const errMsg = Object.values(json.errors).join("; ");
+        await finalizeLog("failed", {
+          error_message: `API-Football error: ${String(errMsg).slice(0, 300)}`,
+          synced_count: 0,
+          settled_count: 0,
+        });
+        return jsonResponse({
+          error: `API-Football error: ${errMsg}`,
+          synced: 0,
+          settled: 0,
+          provider_status: "error",
+        });
+      }
+
       fixtures = json.response || [];
     } catch (fetchErr: unknown) {
       const message =
