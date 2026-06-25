@@ -117,8 +117,16 @@ Deno.serve(async (req: Request) => {
         .eq("id", logId);
     };
 
-    // ── 3. Check for results provider API key ──
-    const resultsApiKey = Deno.env.get("API_FOOTBALL_KEY");
+    // ── 3. Check for results provider API key (env secret first, then DB fallback) ──
+    let resultsApiKey = Deno.env.get("API_FOOTBALL_KEY");
+    if (!resultsApiKey) {
+      const { data: cfgRow } = await supabase
+        .from("app_config")
+        .select("value")
+        .eq("key", "API_FOOTBALL_KEY")
+        .maybeSingle();
+      if (cfgRow?.value) resultsApiKey = cfgRow.value;
+    }
     if (!resultsApiKey) {
       await finalizeLog("failed", {
         error_message:
