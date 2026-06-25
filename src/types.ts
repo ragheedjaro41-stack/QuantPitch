@@ -78,7 +78,7 @@ export type TeamWithStats = Team & {
 };
 
 export type PlayerWithTeam = Player & {
-  team: Pick<Team, "id" | "name" | "short_name" | "primary_color">;
+  team: Pick<Team, "id" | "name" | "short_name" | "primary_color" | "logo_url">;
 };
 
 export type MatchWithTeams = Match & {

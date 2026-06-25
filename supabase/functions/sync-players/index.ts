@@ -357,7 +357,10 @@ Deno.serve(async (req: Request) => {
 
     await finalizeLog("completed", {
       synced_count: totalSynced,
-      details: {
+      skipped_count: totalSkipped,
+      error_count: errors.length,
+      error_message: errors.length > 0 ? errors.join("; ").slice(0, 1000) : null,
+      meta: {
         league: leagueId,
         season,
         teams_processed: teamResults.length,

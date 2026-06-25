@@ -223,7 +223,7 @@ export function usePlayer(id: string | undefined) {
 
       const { data: team } = await supabase
         .from("teams")
-        .select("id, name, short_name, primary_color")
+        .select("id, name, short_name, primary_color, logo_url")
         .eq("id", (player as Player).team_id)
         .single();
 
@@ -472,24 +472,52 @@ export function useDashboardStats() {
       const plId = plLeague?.id;
 
       const [teamsR, playersR, matchesR] = await Promise.all([
-        supabase.from("teams").select("*").eq("league_id", plId),
-        supabase.from("players").select("*").eq("competition", "league"),
+        supabase.from("teams").select("id, name, short_name, primary_color, logo_url").eq("league_id", plId),
+        supabase.from("players").select("*").not("external_id", "is", null).eq("league_id", plId),
         supabase.from("matches").select("*").eq("status", "completed").eq("league_id", plId),
       ]);
 
-      const teams = teamsR.data as Team[];
-      const players = (playersR.data as Player[]).filter((p) =>
-        teams.some((t) => t.id === p.team_id)
-      );
+      const teams = teamsR.data as Pick<Team, "id" | "name" | "short_name" | "primary_color" | "logo_url">[];
+      const teamMap = new Map(teams.map((t) => [t.id, t]));
+      const players = playersR.data as Player[];
       const matches = matchesR.data as Match[];
 
       const totalGoals = matches.reduce(
         (sum, m) => sum + m.home_score + m.away_score,
         0
       );
+
+      const toRanking = (p: Player) => ({
+        id: p.id,
+        name: p.name,
+        photo_url: p.photo_url,
+        team_name: teamMap.get(p.team_id)?.name ?? "Unknown",
+        team_logo_url: teamMap.get(p.team_id)?.logo_url ?? null,
+        goals: p.goals,
+        assists: p.assists,
+        rating: p.rating,
+        appearances: p.appearances,
+      });
+
       const topScorers = [...players]
+        .filter((p) => p.goals > 0)
         .sort((a, b) => b.goals - a.goals || b.assists - a.assists)
-        .slice(0, 5);
+        .slice(0, 5)
+        .map(toRanking);
+
+      const topAssists = [...players]
+        .filter((p) => p.assists > 0)
+        .sort((a, b) => b.assists - a.assists || b.goals - a.goals)
+        .slice(0, 5)
+        .map(toRanking);
+
+      const topRated = [...players]
+        .filter((p) => p.rating > 0 && p.appearances >= 10)
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 5)
+        .map(toRanking);
+
+      const ratedPlayers = players.filter((p) => p.rating > 0);
 
       const maxRound = matches.reduce((max, m) => Math.max(max, m.round), 0);
       const roundCount = Math.min(maxRound, 38);
@@ -506,13 +534,16 @@ export function useDashboardStats() {
       return {
         teamCount: teams.length,
         playerCount: players.length,
+        ratedCount: ratedPlayers.length,
         matchCount: matches.length,
         totalGoals,
         topScorers,
+        topAssists,
+        topRated,
         goalsPerRound,
         avgRating:
-          players.length > 0
-            ? players.reduce((sum, p) => sum + p.rating, 0) / players.length
+          ratedPlayers.length > 0
+            ? ratedPlayers.reduce((sum, p) => sum + p.rating, 0) / ratedPlayers.length
             : 0,
       };
     },

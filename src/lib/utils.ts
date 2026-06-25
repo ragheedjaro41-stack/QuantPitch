@@ -14,19 +14,61 @@ export function formatTime(dateStr: string): string {
 }
 
 export function positionColor(position: string): string {
-  if (position === "GK") return "#fbbf24";
-  if (["CB", "RB", "LB"].includes(position)) return "#10B981";
-  if (["CM", "CDM", "CAM", "AM"].includes(position)) return "#00D4FF";
-  if (["RW", "LW", "ST", "CF"].includes(position)) return "#f87171";
-  return "#a78bfa";
+  switch (position) {
+    case "GK": return "#fbbf24";
+    case "DEF":
+    case "CB":
+    case "RB":
+    case "LB":
+      return "#3b82f6";
+    case "MID":
+    case "CM":
+    case "CDM":
+    case "CAM":
+    case "AM":
+      return "#10B981";
+    case "FWD":
+    case "RW":
+    case "LW":
+    case "ST":
+    case "CF":
+      return "#f87171";
+    default: return "#64748b";
+  }
 }
 
 export function positionGroup(position: string): string {
-  if (position === "GK") return "Goalkeeper";
-  if (["CB", "RB", "LB"].includes(position)) return "Defender";
-  if (["CM", "CDM", "CAM"].includes(position)) return "Midfielder";
-  if (["RW", "LW", "ST", "CF"].includes(position)) return "Forward";
-  return position;
+  switch (position) {
+    case "GK": return "Goalkeeper";
+    case "DEF":
+    case "CB":
+    case "RB":
+    case "LB":
+      return "Defender";
+    case "MID":
+    case "CM":
+    case "CDM":
+    case "CAM":
+      return "Midfielder";
+    case "FWD":
+    case "RW":
+    case "LW":
+    case "ST":
+    case "CF":
+      return "Forward";
+    default: return position;
+  }
+}
+
+export function positionLabel(position: string): string {
+  switch (position) {
+    case "GK": return "Goalkeeper";
+    case "DEF": return "Defender";
+    case "MID": return "Midfielder";
+    case "FWD": return "Forward";
+    case "SUB": return "Substitute";
+    default: return position;
+  }
 }
 
 export function ratingColor(rating: number): string {

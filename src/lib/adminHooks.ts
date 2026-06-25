@@ -948,7 +948,7 @@ export function usePlayerSyncSummary() {
           .limit(20),
         supabase
           .from("players")
-          .select("id, team_id, external_id, league_id, name, position, goals, assists, appearances, rating"),
+          .select("id, team_id, external_id, league_id, name, position, goals, assists, appearances, rating, height_cm, weight_kg, photo_url, minutes_played, yellow_cards, red_cards"),
         supabase
           .from("teams")
           .select("id, name, external_id, league_id")
@@ -959,6 +959,8 @@ export function usePlayerSyncSummary() {
       const players = (playersR.data || []) as Array<{
         id: string; team_id: string; external_id: string | null; league_id: string | null;
         name: string; position: string; goals: number; assists: number; appearances: number; rating: number;
+        height_cm: number | null; weight_kg: number | null; photo_url: string | null;
+        minutes_played: number; yellow_cards: number; red_cards: number;
       }>;
       const teams = (teamsR.data || []) as Array<{
         id: string; name: string; external_id: string | null; league_id: string | null;
@@ -975,6 +977,15 @@ export function usePlayerSyncSummary() {
         }
       }
       const duplicates = [...duplicateCheck.entries()].filter(([, c]) => c > 1).length;
+
+      const fieldCoverage = [
+        { field: "rating", label: "Rating", count: realPlayers.filter((p) => p.rating > 0).length },
+        { field: "height", label: "Height", count: realPlayers.filter((p) => p.height_cm != null).length },
+        { field: "weight", label: "Weight", count: realPlayers.filter((p) => p.weight_kg != null).length },
+        { field: "photo", label: "Photo", count: realPlayers.filter((p) => p.photo_url != null).length },
+        { field: "appearances", label: "Apps", count: realPlayers.filter((p) => p.appearances > 0).length },
+        { field: "minutes", label: "Minutes", count: realPlayers.filter((p) => p.minutes_played > 0).length },
+      ];
 
       return {
         logs,
@@ -993,6 +1004,7 @@ export function usePlayerSyncSummary() {
           FWD: realPlayers.filter((p) => p.position === "FWD").length,
           SUB: realPlayers.filter((p) => p.position === "SUB").length,
         },
+        field_coverage: fieldCoverage,
       };
     },
   });

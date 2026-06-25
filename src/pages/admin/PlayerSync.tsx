@@ -5,18 +5,7 @@ import {
   useApiFootballSyncCooldown,
 } from "../../lib/adminHooks";
 import { PageHeader, Spinner, StatCard } from "../../components/ui";
-import {
-  Users,
-  RefreshCw,
-  Loader as Loader2,
-  CircleCheck as CheckCircle,
-  CircleX as XCircle,
-  CircleAlert as AlertCircle,
-  Shield,
-  ShieldAlert,
-  Trophy,
-  Target,
-} from "lucide-react";
+import { Users, RefreshCw, Loader as Loader2, CircleCheck as CheckCircle, CircleX as XCircle, CircleAlert as AlertCircle, Shield, ShieldAlert, Trophy, Target, ChartBar as BarChart3 } from "lucide-react";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -29,6 +18,15 @@ function timeSince(iso: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function statusIcon(status: string) {
+  switch (status) {
+    case "completed": return <CheckCircle size={12} className="text-good" />;
+    case "failed": return <XCircle size={12} className="text-bad" />;
+    case "running": return <Loader2 size={12} className="text-warn animate-spin" />;
+    default: return <AlertCircle size={12} className="text-slate-500" />;
+  }
 }
 
 function statusColor(status: string): string {
@@ -122,30 +120,57 @@ export default function PlayerSync() {
       )}
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <StatCard label="Real Players" value={s?.total_real_players ?? 0} icon={<Users size={18} />} accent="#00D4FF" />
         <StatCard label="Teams Done" value={`${s?.teams_completed ?? 0}/${s?.total_synced_teams ?? 0}`} icon={<Shield size={18} />} accent="#10B981" />
         <StatCard label="Demo Players" value={s?.total_demo_players ?? 0} icon={<ShieldAlert size={18} />} accent="#f97316" />
         <StatCard label="Duplicates" value={s?.duplicates ?? 0} icon={<AlertCircle size={18} />} accent={s?.duplicates ? "#f87171" : "#10B981"} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Field coverage cards */}
+      {s && s.total_real_players > 0 && (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 size={16} className="text-accent" />
+            <h2 className="text-base font-semibold text-white">Field Coverage</h2>
+            <span className="text-xs text-slate-500 ml-auto">{s.total_real_players} real players</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {s.field_coverage.map((fc) => {
+              const pct = s.total_real_players > 0 ? Math.round((fc.count / s.total_real_players) * 100) : 0;
+              const barColor = pct >= 80 ? "#10B981" : pct >= 50 ? "#fbbf24" : "#f87171";
+              return (
+                <div key={fc.field} className="rounded-xl bg-base-700/30 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{fc.label}</p>
+                  <p className="font-mono text-lg font-bold text-white">{pct}%</p>
+                  <div className="h-1.5 rounded-full bg-base-700 mt-2 overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">{fc.count}/{s.total_real_players}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Position breakdown */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Position Breakdown</h2>
+        <div className="card p-5">
+          <h2 className="text-base font-semibold text-white mb-4">Position Breakdown</h2>
           {s && s.total_real_players > 0 ? (
             <div className="space-y-3">
               {(["GK", "DEF", "MID", "FWD", "SUB"] as const).map((pos) => {
                 const count = s.position_breakdown[pos];
                 const pct = s.total_real_players > 0 ? Math.round((count / s.total_real_players) * 100) : 0;
-                const colors: Record<string, string> = { GK: "#f59e0b", DEF: "#3b82f6", MID: "#10b981", FWD: "#ef4444", SUB: "#64748b" };
+                const colors: Record<string, string> = { GK: "#fbbf24", DEF: "#3b82f6", MID: "#10b981", FWD: "#ef4444", SUB: "#64748b" };
                 return (
                   <div key={pos} className="flex items-center gap-3">
                     <span className="w-10 text-xs font-bold" style={{ color: colors[pos] }}>{pos}</span>
                     <div className="flex-1 h-2 rounded-full bg-base-700 overflow-hidden">
                       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: colors[pos] }} />
                     </div>
-                    <span className="text-xs text-slate-400 w-12 text-right">{count} ({pct}%)</span>
+                    <span className="text-xs text-slate-400 w-16 text-right">{count} ({pct}%)</span>
                   </div>
                 );
               })}
@@ -156,8 +181,8 @@ export default function PlayerSync() {
         </div>
 
         {/* Missing teams */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Missing Teams</h2>
+        <div className="card p-5">
+          <h2 className="text-base font-semibold text-white mb-4">Missing Teams</h2>
           {s && s.teams_missing.length > 0 ? (
             <div className="space-y-2">
               {s.teams_missing.map((t) => (
@@ -179,23 +204,23 @@ export default function PlayerSync() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Top scorers */}
-        <div className="card p-6">
+        <div className="card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy size={16} className="text-accent" />
-            <h2 className="text-lg font-semibold text-white">Top Scorers (Synced)</h2>
+            <h2 className="text-base font-semibold text-white">Top Scorers (Synced)</h2>
           </div>
           {s && s.top_scorers.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {s.top_scorers.map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-base-700/30 transition-colors">
-                  <span className="font-mono text-sm text-slate-500 w-5">{i + 1}</span>
+                  <span className="font-mono text-xs text-slate-600 w-4">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.position} - {p.appearances} apps</p>
+                    <p className="text-[10px] text-slate-500">{p.position} &middot; {p.appearances} apps</p>
                   </div>
-                  <span className="font-mono text-sm font-bold text-accent">{p.goals}</span>
+                  <span className="font-mono text-sm font-bold text-accent">{p.goals}G</span>
                 </div>
               ))}
             </div>
@@ -205,21 +230,21 @@ export default function PlayerSync() {
         </div>
 
         {/* Top assists */}
-        <div className="card p-6">
+        <div className="card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Target size={16} className="text-good" />
-            <h2 className="text-lg font-semibold text-white">Top Assists (Synced)</h2>
+            <h2 className="text-base font-semibold text-white">Top Assists (Synced)</h2>
           </div>
           {s && s.top_assists.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {s.top_assists.map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-base-700/30 transition-colors">
-                  <span className="font-mono text-sm text-slate-500 w-5">{i + 1}</span>
+                  <span className="font-mono text-xs text-slate-600 w-4">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.position} - {p.appearances} apps</p>
+                    <p className="text-[10px] text-slate-500">{p.position} &middot; {p.appearances} apps</p>
                   </div>
-                  <span className="font-mono text-sm font-bold text-good">{p.assists}</span>
+                  <span className="font-mono text-sm font-bold text-good">{p.assists}A</span>
                 </div>
               ))}
             </div>
@@ -230,36 +255,37 @@ export default function PlayerSync() {
       </div>
 
       {/* Sync history */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Sync History</h2>
+      <div className="card p-5">
+        <h2 className="text-base font-semibold text-white mb-4">Sync History</h2>
         {s && s.logs.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px]">
+            <table className="w-full min-w-[540px]">
               <thead>
                 <tr className="border-b border-base-700">
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">When</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-slate-500">Synced</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-slate-500">Errors</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Details</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">When</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Synced</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Errors</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">Details</th>
                 </tr>
               </thead>
               <tbody>
                 {s.logs.map((log) => {
-                  const details = log.meta as Record<string, unknown> | null;
+                  const meta = log.meta as Record<string, unknown> | null;
+                  const teamsProcessed = meta?.teams_processed;
                   return (
-                    <tr key={log.id} className="border-b border-base-700/40">
+                    <tr key={log.id} className="border-b border-base-700/30">
                       <td className="px-3 py-2.5">
                         <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: statusColor(log.status) }}>
-                          {log.status === "completed" ? <CheckCircle size={12} /> : log.status === "failed" ? <XCircle size={12} /> : <Loader2 size={12} className="animate-spin" />}
+                          {statusIcon(log.status)}
                           {log.status}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-slate-400">{timeSince(log.started_at)}</td>
                       <td className="px-3 py-2.5 text-xs text-white text-right font-mono">{log.synced_count}</td>
                       <td className="px-3 py-2.5 text-xs text-right font-mono" style={{ color: log.error_count > 0 ? "#f87171" : "#64748b" }}>{log.error_count}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-500 max-w-xs truncate">
-                        {log.error_message || (details ? `${(details as Record<string, unknown>).teams_processed ?? "?"} teams` : "-")}
+                      <td className="px-3 py-2.5 text-xs text-slate-500 max-w-[200px] truncate">
+                        {log.error_message || (teamsProcessed != null ? `${teamsProcessed} teams` : "-")}
                       </td>
                     </tr>
                   );
