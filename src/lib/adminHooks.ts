@@ -742,3 +742,56 @@ export function useSettlementSummary() {
     },
   });
 }
+
+// ============================================================
+// RESULTS SYNC LOG
+// ============================================================
+
+export type ResultsSyncLogRow = {
+  id: string;
+  provider: string;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  synced_count: number;
+  settled_count: number;
+  void_count: number;
+  missing_score_count: number;
+  error_message: string | null;
+  sport_key: string | null;
+};
+
+export function useResultsSyncLog(limit = 10) {
+  return useQuery({
+    queryKey: ["results-sync-log", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("results_sync_log")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as ResultsSyncLogRow[];
+    },
+  });
+}
+
+export function useResultsSyncCooldown() {
+  return useQuery({
+    queryKey: ["results-sync-cooldown"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("results_sync_log")
+        .select("id, started_at, status")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return { onCooldown: false, remaining: 0 };
+      const elapsed = (Date.now() - new Date(data.started_at).getTime()) / 1000;
+      const remaining = Math.max(0, Math.ceil(120 - elapsed));
+      return { onCooldown: remaining > 0, remaining };
+    },
+  });
+}

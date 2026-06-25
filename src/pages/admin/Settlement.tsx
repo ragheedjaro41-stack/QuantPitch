@@ -1,22 +1,18 @@
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useMatchResults,
   useSettlementLog,
   usePendingSettlementMatches,
   useSettlementSummary,
-  useTrustedMarkets,
+  useResultsSyncLog,
+  useResultsSyncCooldown,
 } from "../../lib/adminHooks";
 import { PageHeader, Spinner } from "../../components/ui";
-import {
-  CircleCheck as CheckCircle,
-  CircleX as XCircle,
-  CircleAlert as AlertCircle,
-  Clock,
-  Database,
-  ShieldCheck,
-  FileWarning,
-  List,
-  Trophy,
-} from "lucide-react";
+import { CircleCheck as CheckCircle, CircleX as XCircle, CircleAlert as AlertCircle, Clock, Database, ShieldCheck, FileWarning, List, RefreshCw, Loader as Loader2 } from "lucide-react";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function timeSince(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -32,6 +28,7 @@ function statusColor(status: string): string {
   switch (status) {
     case "confirmed":
     case "settled":
+    case "completed":
       return "#10B981";
     case "void":
     case "postponed":
@@ -39,8 +36,10 @@ function statusColor(status: string): string {
     case "abandoned":
       return "#fbbf24";
     case "pending_review":
+    case "running":
       return "#f97316";
     case "error":
+    case "failed":
       return "#f87171";
     default:
       return "#64748b";
@@ -68,11 +67,16 @@ function outcomeColor(outcome: string): string {
 }
 
 export default function Settlement() {
+  const qc = useQueryClient();
   const { data: summary, isLoading: sL } = useSettlementSummary();
   const { data: results, isLoading: rL } = useMatchResults(30);
   const { data: logs } = useSettlementLog(50);
   const { data: pendingData, isLoading: pL } = usePendingSettlementMatches();
-  const { data: trustedMarkets } = useTrustedMarkets();
+  const { data: syncLogs } = useResultsSyncLog(10);
+  const { data: cooldown } = useResultsSyncCooldown();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   if (sL || rL || pL) return <Spinner />;
 
@@ -80,7 +84,10 @@ export default function Settlement() {
   const totalSettled = pendingData?.totalSettled ?? 0;
   const allResults = results || [];
   const allLogs = logs || [];
-  const markets = trustedMarkets || [];
+  const allSyncLogs = syncLogs || [];
+  const lastSync = allSyncLogs[0] || null;
+  const isOnCooldown = cooldown?.onCooldown ?? false;
+  const cooldownRemaining = cooldown?.remaining ?? 0;
 
   const confirmedResults = allResults.filter((r) => r.match_status === "confirmed");
   const voidResults = allResults.filter((r) =>
@@ -88,12 +95,146 @@ export default function Settlement() {
   );
   const reviewResults = allResults.filter((r) => r.match_status === "pending_review");
 
+  async function runResultsSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-results`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSyncResult({ ok: false, message: json.error || `HTTP ${res.status}` });
+      } else {
+        setSyncResult({
+          ok: true,
+          message: json.message || `Synced ${json.synced}, settled ${json.settled}`,
+        });
+      }
+    } catch (err) {
+      setSyncResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "Network error",
+      });
+    } finally {
+      setSyncing(false);
+      qc.invalidateQueries({ queryKey: ["results-sync-log"] });
+      qc.invalidateQueries({ queryKey: ["results-sync-cooldown"] });
+      qc.invalidateQueries({ queryKey: ["settlement-summary"] });
+      qc.invalidateQueries({ queryKey: ["match-results"] });
+      qc.invalidateQueries({ queryKey: ["settlement-log"] });
+      qc.invalidateQueries({ queryKey: ["pending-settlement-matches"] });
+    }
+  }
+
   return (
     <div className="px-8 py-8 max-w-7xl mx-auto">
       <PageHeader
         title="Settlement"
         subtitle="Results verification, market settlement, and audit log"
       />
+
+      {/* Results sync controls */}
+      <div className="card p-5 mb-8 border border-base-600/50">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-white">Results Sync</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Fetch confirmed match results from the provider, then run settlement on all markets.
+            </p>
+          </div>
+          <button
+            onClick={runResultsSync}
+            disabled={syncing || isOnCooldown}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+            style={{
+              backgroundColor: syncing || isOnCooldown ? "#1e293b" : "#00D4FF15",
+              color: syncing || isOnCooldown ? "#64748b" : "#00D4FF",
+              border: `1px solid ${syncing || isOnCooldown ? "#334155" : "#00D4FF40"}`,
+              cursor: syncing || isOnCooldown ? "not-allowed" : "pointer",
+            }}
+          >
+            {syncing ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {syncing
+              ? "Syncing..."
+              : isOnCooldown
+              ? `Cooldown ${cooldownRemaining}s`
+              : "Run Results Sync"}
+          </button>
+        </div>
+
+        {/* Sync result banner */}
+        {syncResult && (
+          <div
+            className="px-4 py-2.5 rounded-lg mb-4 text-xs"
+            style={{
+              backgroundColor: syncResult.ok ? "#10B98110" : "#f8717110",
+              border: `1px solid ${syncResult.ok ? "#10B98130" : "#f8717130"}`,
+              color: syncResult.ok ? "#10B981" : "#f87171",
+            }}
+          >
+            {syncResult.message}
+          </div>
+        )}
+
+        {/* Last sync status */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Last Sync</p>
+            <p className="text-sm text-white font-mono">
+              {lastSync ? timeSince(lastSync.started_at) : "Never"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Status</p>
+            <p
+              className="text-sm font-bold"
+              style={{ color: lastSync ? statusColor(lastSync.status) : "#64748b" }}
+            >
+              {lastSync ? lastSync.status.toUpperCase() : "N/A"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Results Synced</p>
+            <p className="text-sm text-white font-mono font-bold">
+              {lastSync?.synced_count ?? 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Settled / Void</p>
+            <p className="text-sm font-mono">
+              <span className="text-good font-bold">{lastSync?.settled_count ?? 0}</span>
+              <span className="text-slate-500"> / </span>
+              <span className="text-warn font-bold">{lastSync?.void_count ?? 0}</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Missing Scores</p>
+            <p
+              className="text-sm font-mono font-bold"
+              style={{ color: (lastSync?.missing_score_count ?? 0) > 0 ? "#f87171" : "#10B981" }}
+            >
+              {lastSync?.missing_score_count ?? 0}
+            </p>
+          </div>
+        </div>
+
+        {/* Error from last sync */}
+        {lastSync?.error_message && (
+          <div className="mt-3 px-3 py-2 rounded-lg bg-bad/10 border border-bad/20">
+            <p className="text-xs text-bad break-all">{lastSync.error_message}</p>
+          </div>
+        )}
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
@@ -139,7 +280,68 @@ export default function Settlement() {
         </div>
       </div>
 
-      {/* Pending matches (no result yet) */}
+      {/* Results Sync History */}
+      <h2 className="text-sm font-bold text-white mb-3">Results Sync History</h2>
+      <div className="card overflow-hidden mb-8">
+        {allSyncLogs.length === 0 ? (
+          <div className="p-6 text-center">
+            <RefreshCw size={20} className="text-slate-600 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No results sync attempts yet. Click "Run Results Sync" to begin.</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-base-700/60 bg-base-700/20">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-28">When</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Synced</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Settled</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-16">Void</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Missing</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allSyncLogs.map((l) => (
+                <tr key={l.id} className="border-b border-base-700/30 last:border-0">
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs text-slate-400">{timeSince(l.started_at)}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs font-bold" style={{ color: statusColor(l.status) }}>
+                      {l.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-sm font-mono font-bold text-white">{l.synced_count}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-sm font-mono font-bold text-good">{l.settled_count}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-sm font-mono font-bold text-warn">{l.void_count}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className="text-sm font-mono font-bold"
+                      style={{ color: l.missing_score_count > 0 ? "#f87171" : "#10B981" }}
+                    >
+                      {l.missing_score_count}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs text-slate-500 truncate block max-w-[200px]">
+                      {l.error_message || "--"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Pending matches */}
       <h2 className="text-sm font-bold text-white mb-3">
         Pending Matches ({pending.length} awaiting results)
       </h2>
@@ -298,63 +500,29 @@ export default function Settlement() {
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Market</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Trusted</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Settlement</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Rule</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Cup Handling</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-base-700/30">
-              <td className="px-4 py-2.5">
-                <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">h2h</code>
-                <span className="text-sm text-white ml-2">Match Result (1X2)</span>
-              </td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">FT regulation: home &gt; away = HOME, away &gt; home = AWAY, equal = DRAW</span></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
-            </tr>
-            <tr className="border-b border-base-700/30">
-              <td className="px-4 py-2.5">
-                <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">totals_1.5</code>
-                <span className="text-sm text-white ml-2">Over/Under 1.5</span>
-              </td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">FT total &gt; 1.5 = OVER, &lt; 1.5 = UNDER</span></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
-            </tr>
-            <tr className="border-b border-base-700/30">
-              <td className="px-4 py-2.5">
-                <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">totals_2.5</code>
-                <span className="text-sm text-white ml-2">Over/Under 2.5</span>
-              </td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">FT total &gt; 2.5 = OVER, &lt; 2.5 = UNDER</span></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
-            </tr>
-            <tr className="border-b border-base-700/30">
-              <td className="px-4 py-2.5">
-                <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">totals_3.5</code>
-                <span className="text-sm text-white ml-2">Over/Under 3.5</span>
-              </td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">FT total &gt; 3.5 = OVER, &lt; 3.5 = UNDER</span></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
-            </tr>
-            <tr className="border-b border-base-700/30 last:border-0">
-              <td className="px-4 py-2.5">
-                <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">btts</code>
-                <span className="text-sm text-white ml-2">Both Teams to Score</span>
-              </td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">Both FT scores &gt; 0 = YES, otherwise = NO</span></td>
-              <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
-            </tr>
+            {[
+              { key: "h2h", name: "Match Result (1X2)", rule: "FT regulation: home > away = HOME, away > home = AWAY, equal = DRAW" },
+              { key: "totals_1.5", name: "Over/Under 1.5", rule: "FT total > 1.5 = OVER, < 1.5 = UNDER" },
+              { key: "totals_2.5", name: "Over/Under 2.5", rule: "FT total > 2.5 = OVER, < 2.5 = UNDER" },
+              { key: "totals_3.5", name: "Over/Under 3.5", rule: "FT total > 3.5 = OVER, < 3.5 = UNDER" },
+              { key: "btts", name: "Both Teams to Score", rule: "Both FT scores > 0 = YES, otherwise = NO" },
+            ].map((m) => (
+              <tr key={m.key} className="border-b border-base-700/30 last:border-0">
+                <td className="px-4 py-2.5">
+                  <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">{m.key}</code>
+                  <span className="text-sm text-white ml-2">{m.name}</span>
+                </td>
+                <td className="px-4 py-2.5"><CheckCircle size={14} className="text-good" /></td>
+                <td className="px-4 py-2.5"><span className="text-xs text-slate-400">{m.rule}</span></td>
+                <td className="px-4 py-2.5"><span className="text-xs text-slate-400">90min only</span></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -393,7 +561,7 @@ export default function Settlement() {
         {allLogs.length === 0 ? (
           <div className="p-6 text-center">
             <List size={20} className="text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-400">No settlement entries yet. Results must be ingested first.</p>
+            <p className="text-sm text-slate-400">No settlement entries yet. Run a results sync to begin.</p>
           </div>
         ) : (
           <table className="w-full">
@@ -451,15 +619,19 @@ export default function Settlement() {
             </p>
             <p className="text-xs text-slate-300">
               <strong className="text-white">3. Cup matches: regulation time only.</strong>{" "}
-              h2h, totals, and BTTS all settle from ft_home/ft_away (90 min). Extra time and penalties are recorded separately and never affect standard market outcomes.
+              h2h, totals, and BTTS all settle from ft_home/ft_away (90 min). Extra time and penalties are recorded but never affect standard market outcomes.
             </p>
             <p className="text-xs text-slate-300">
               <strong className="text-white">4. No fake results.</strong>{" "}
-              Results must come from a confirmed provider source. The settlement engine never generates or invents scores.
+              Results come only from a provider with a valid API key. Missing key = no sync, no results, no settlement.
             </p>
             <p className="text-xs text-slate-300">
-              <strong className="text-white">5. Unknown markets are rejected.</strong>{" "}
-              Only h2h, totals_1.5, totals_2.5, totals_3.5, and btts are supported. Any other market key produces an error status.
+              <strong className="text-white">5. Missing final score = skip.</strong>{" "}
+              If the API reports a match as finished but the score is null, it is logged as missing_score and skipped entirely.
+            </p>
+            <p className="text-xs text-slate-300">
+              <strong className="text-white">6. Rate-limited syncs.</strong>{" "}
+              120s cooldown between sync attempts. Protects API quota and prevents duplicate settlement.
             </p>
           </div>
         </div>
