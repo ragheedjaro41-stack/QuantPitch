@@ -56,7 +56,7 @@ export default function ProviderSetup() {
   const theOddsApi = allProviders.find((p) => p.slug === "the-odds-api");
 
   return (
-    <div className="px-8 py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
       <PageHeader
         title="Provider Setup"
         subtitle="Configure odds provider credentials to activate LIVE_PICK"

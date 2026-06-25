@@ -75,7 +75,7 @@ export default function MissingData() {
   const high = items.filter((i) => i.risk_level === "high");
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Provider Missing Data" subtitle="Competitions with coverage gaps flagged for resolution" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

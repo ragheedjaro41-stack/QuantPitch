@@ -20,7 +20,7 @@ export default function AdminTeams() {
   });
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Team Registry" subtitle={`${data.length} teams registered`} />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">

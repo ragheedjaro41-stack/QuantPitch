@@ -96,7 +96,7 @@ export default function AdminCups() {
   );
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Cup Competitions" subtitle={`${data?.length ?? 0} cup and tournament competitions`} />
 
       <div className="flex gap-2 mb-6 flex-wrap">

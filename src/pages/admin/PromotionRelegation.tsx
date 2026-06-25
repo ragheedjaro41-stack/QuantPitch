@@ -18,7 +18,7 @@ export default function PromotionRelegation() {
   const top3 = teams.slice(0, 3);
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Promotion / Relegation" subtitle="Current season promotion and relegation tracking" />
 
       {/* Example from the app's internal league */}

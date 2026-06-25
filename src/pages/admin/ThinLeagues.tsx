@@ -40,7 +40,7 @@ export default function ThinLeagues() {
   const unknown = leagues.filter((l) => l.provider_flag === "unknown");
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Thin Leagues" subtitle="Data-risk and coverage-deficient competitions" />
 
       {/* Summary cards */}

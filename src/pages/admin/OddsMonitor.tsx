@@ -63,7 +63,7 @@ export default function OddsMonitor() {
   const cooldownRemaining = cooldown?.remaining ?? 0;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader
         title="Odds Monitor"
         subtitle="Live connection audit -- provider health, sync status, league freshness"

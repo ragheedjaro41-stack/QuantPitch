@@ -139,7 +139,7 @@ export default function WorldCup() {
   const final = knockoutByStage["final"]?.[0];
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader
         title="World Cup 2026"
         subtitle="USA · Canada · Mexico — June–July 2026"

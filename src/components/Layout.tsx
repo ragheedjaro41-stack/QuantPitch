@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale, Zap, Menu, X, Rocket, CalendarClock } from "lucide-react";
+import {
+  LayoutDashboard, Shield, Users, Trophy, Globe, Settings,
+  ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle,
+  ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key,
+  ListChecks, Scale, Zap, Menu, X, Rocket, CalendarClock,
+  Layers, UserSearch, Search,
+} from "lucide-react";
 
 const mainNav = [
   { to: "/",          label: "Dashboard",  icon: LayoutDashboard, end: true },
@@ -10,28 +16,51 @@ const mainNav = [
   { to: "/world-cup", label: "World Cup",  icon: Globe,           end: false },
 ];
 
-const adminNav = [
-  { to: "/admin",                      label: "Overview",        icon: Settings },
-  { to: "/admin/leagues",              label: "Leagues",         icon: Globe },
-  { to: "/admin/tiers",                label: "Tiers",           icon: BarChart2 },
-  { to: "/admin/cups",                 label: "Cups",            icon: Trophy },
-  { to: "/admin/cup-fixtures",         label: "Cup Fixtures",    icon: Trophy },
-  { to: "/admin/coverage",             label: "Data Coverage",   icon: Database },
-  { to: "/admin/thin-leagues",         label: "Thin Leagues",    icon: AlertTriangle },
-  { to: "/admin/missing-data",         label: "Provider Gaps",   icon: AlertTriangle },
-  { to: "/admin/teams",                label: "Teams",           icon: Shield },
-  { to: "/admin/promotion-relegation", label: "P/R Tracker",     icon: ArrowUpDown },
-  { to: "/admin/audit",                label: "Audit Report",    icon: ClipboardList },
-  { to: "/admin/alias-queue",          label: "Alias Queue",     icon: Tag },
-  { to: "/admin/odds-monitor",          label: "Odds Monitor",    icon: Radio },
-  { to: "/admin/api-football",          label: "API-Football",    icon: Zap },
-  { to: "/admin/player-sync",          label: "Player Sync",     icon: Users },
-  { to: "/admin/provider-setup",       label: "Provider Setup",  icon: Key },
-  { to: "/admin/settlement",            label: "Settlement",      icon: Scale },
-  { to: "/admin/activation",            label: "Activation",      icon: ListChecks },
-  { to: "/admin/certification",        label: "Certification",   icon: BadgeCheck },
-  { to: "/admin/automation",            label: "Automation",      icon: CalendarClock },
-  { to: "/admin/readiness",            label: "Prod Readiness",  icon: Rocket },
+type NavItem = { to: string; label: string; icon: typeof Settings };
+type NavSection = { heading: string; items: NavItem[] };
+
+const adminSections: NavSection[] = [
+  {
+    heading: "Competitions",
+    items: [
+      { to: "/admin",                      label: "Overview",        icon: Settings },
+      { to: "/admin/leagues",              label: "Leagues",         icon: Globe },
+      { to: "/admin/tiers",                label: "Tiers",           icon: BarChart2 },
+      { to: "/admin/cups",                 label: "Cups",            icon: Trophy },
+      { to: "/admin/cup-fixtures",         label: "Cup Fixtures",    icon: Layers },
+      { to: "/admin/teams",                label: "Teams",           icon: Shield },
+      { to: "/admin/promotion-relegation", label: "P/R Tracker",     icon: ArrowUpDown },
+    ],
+  },
+  {
+    heading: "Data Quality",
+    items: [
+      { to: "/admin/coverage",             label: "Data Coverage",   icon: Database },
+      { to: "/admin/thin-leagues",         label: "Thin Leagues",    icon: AlertTriangle },
+      { to: "/admin/missing-data",         label: "Provider Gaps",   icon: Search },
+      { to: "/admin/audit",                label: "Audit Report",    icon: ClipboardList },
+      { to: "/admin/alias-queue",          label: "Alias Queue",     icon: Tag },
+    ],
+  },
+  {
+    heading: "Providers",
+    items: [
+      { to: "/admin/api-football",         label: "API-Football",    icon: Zap },
+      { to: "/admin/player-sync",          label: "Player Sync",     icon: UserSearch },
+      { to: "/admin/odds-monitor",         label: "Odds Monitor",    icon: Radio },
+      { to: "/admin/provider-setup",       label: "Provider Setup",  icon: Key },
+    ],
+  },
+  {
+    heading: "Operations",
+    items: [
+      { to: "/admin/settlement",           label: "Settlement",      icon: Scale },
+      { to: "/admin/automation",           label: "Automation",      icon: CalendarClock },
+      { to: "/admin/activation",           label: "Activation",      icon: ListChecks },
+      { to: "/admin/certification",        label: "Certification",   icon: BadgeCheck },
+      { to: "/admin/readiness",            label: "Prod Readiness",  icon: Rocket },
+    ],
+  },
 ];
 
 export default function Layout() {
@@ -71,21 +100,24 @@ export default function Layout() {
           </NavLink>
         ))}
 
-        <div className="pt-4 pb-1 px-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-600">Admin</p>
-        </div>
-
-        {adminNav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/admin"}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) => `nav-link text-xs py-2 ${isActive ? "nav-link-active" : ""}`}
-          >
-            <item.icon size={15} />
-            {item.label}
-          </NavLink>
+        {adminSections.map((section) => (
+          <div key={section.heading}>
+            <div className="pt-4 pb-1 px-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">{section.heading}</p>
+            </div>
+            {section.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/admin"}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) => `nav-link text-xs py-2 ${isActive ? "nav-link-active" : ""}`}
+              >
+                <item.icon size={15} />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 

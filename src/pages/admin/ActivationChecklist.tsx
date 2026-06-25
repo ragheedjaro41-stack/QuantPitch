@@ -89,7 +89,7 @@ export default function ActivationChecklist() {
   if (!hasLiveLeagues && hasFreshOdds) blockers.push("No league has has_live_odds=true with playable=true");
 
   return (
-    <div className="px-8 py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
       <PageHeader
         title="Activation Checklist"
         subtitle="Final pre-launch report -- every gate between current state and LIVE_PICK"

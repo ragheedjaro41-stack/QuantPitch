@@ -40,7 +40,7 @@ export default function CupFixtures() {
   const neutral = filtered.filter((f: any) => f.is_neutral_venue);
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Cup Fixtures" subtitle="Knockout and group stage fixture browser" />
 
       {/* Quick stats */}

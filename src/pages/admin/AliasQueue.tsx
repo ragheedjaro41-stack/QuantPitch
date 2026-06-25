@@ -48,7 +48,7 @@ export default function AliasQueue() {
   );
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader
         title="Alias Review Queue"
         subtitle="Unresolved provider team names awaiting canonical ID assignment"

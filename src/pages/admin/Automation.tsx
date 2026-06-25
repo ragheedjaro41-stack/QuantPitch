@@ -114,8 +114,8 @@ function JobCard({ job }: { job: SyncJobStatus }) {
 
       {/* Cron / cooldown / last error */}
       <div className="border-t border-base-700/30 px-5 py-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             <CalendarClock size={12} className="text-accent" />
             <span className="text-xs text-slate-400">Recommended:</span>
             <code className="text-[10px] text-accent bg-base-700/60 px-1.5 py-0.5 rounded font-mono">{job.recommendedCron}</code>
@@ -189,7 +189,7 @@ export default function Automation() {
   const withKey = jobs.filter((j) => j.hasApiKey).length;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader
         title="Automation"
         subtitle="Scheduled sync readiness, cron configuration, and health monitoring"
@@ -242,8 +242,8 @@ export default function Automation() {
 
       {/* Cron reference table */}
       <h2 className="text-sm font-bold text-white mb-3">Recommended Cron Schedule</h2>
-      <div className="card overflow-hidden mb-8">
-        <table className="w-full">
+      <div className="card overflow-hidden mb-8 overflow-x-auto">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Job</th>

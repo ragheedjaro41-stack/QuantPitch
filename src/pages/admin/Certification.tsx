@@ -161,7 +161,7 @@ export default function Certification() {
   const lastRefresh = refreshLog?.[0];
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader
         title="Production Certification"
         subtitle="LIVE READY · DEMO ONLY · BLOCKED · MISSING ODDS · MISSING MODEL DATA · MISSING SETTLEMENT · NEEDS PROVIDER DATA"
