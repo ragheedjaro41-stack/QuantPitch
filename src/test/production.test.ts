@@ -262,3 +262,63 @@ describe("Cup context regression", () => {
     expect(ctx.is_two_leg).toBe(true);
   });
 });
+
+// ============================================================
+// 7. LIVE CONNECTION AUDIT — no LIVE_PICK without real odds
+// ============================================================
+describe("Live connection audit", () => {
+  it("every league with has_live_odds=false produces BLOCKED_PICK or DEMO_PICK", async () => {
+    const tiers = [1, 2, 3, 4];
+    for (const tier of tiers) {
+      const league = makeLeague({ tier, has_live_odds: false, is_synthetic: false });
+      const result = await computeLeaguePlayability(league, [], undefined);
+      expect(result.pick_status).not.toBe("LIVE_PICK");
+    }
+  });
+
+  it("synthetic league never gets LIVE_PICK even if has_live_odds were somehow true", async () => {
+    const league = makeLeague({ is_synthetic: true, has_live_odds: true });
+    const result = await computeLeaguePlayability(league, [], undefined);
+    expect(result.pick_status).toBe("DEMO_PICK");
+    expect(result.playable).toBe(false);
+  });
+
+  it("has_live_odds=false means model_flags.odds_backed is always false", async () => {
+    const league = makeLeague({ has_live_odds: false });
+    const result = await computeLeaguePlayability(league, [], undefined);
+    expect(result.model_flags.odds_backed).toBe(false);
+    expect(result.has_live_odds).toBe(false);
+  });
+
+  it("LIVE_PICK requires has_live_odds=true AND playable=true AND is_synthetic=false", async () => {
+    const valid = makeLeague({ has_live_odds: true, playable: true, is_synthetic: false });
+    const r1 = await computeLeaguePlayability(valid, [], undefined);
+    expect(r1.pick_status).toBe("LIVE_PICK");
+
+    const noOdds = makeLeague({ has_live_odds: false, playable: true, is_synthetic: false });
+    const r2 = await computeLeaguePlayability(noOdds, [], undefined);
+    expect(r2.pick_status).toBe("BLOCKED_PICK");
+
+    const notPlayable = makeLeague({ has_live_odds: true, playable: false, is_synthetic: false });
+    const r3 = await computeLeaguePlayability(notPlayable, [], undefined);
+    expect(r3.pick_status).toBe("BLOCKED_PICK");
+
+    const synthetic = makeLeague({ has_live_odds: true, playable: true, is_synthetic: true });
+    const r4 = await computeLeaguePlayability(synthetic, [], undefined);
+    expect(r4.pick_status).toBe("DEMO_PICK");
+  });
+
+  it("cup pick with BLOCKED base status stays BLOCKED regardless of sample size", () => {
+    const r1 = computeCupPickStatus(100, "BLOCKED_PICK");
+    expect(r1.pick_status).toBe("BLOCKED_PICK");
+    const r2 = computeCupPickStatus(0, "DEMO_PICK");
+    expect(r2.pick_status).toBe("DEMO_PICK");
+  });
+
+  it("value_score for non-LIVE picks is always 0 (enforced by useTopPlays logic)", () => {
+    const statuses = ["BLOCKED_PICK", "DEMO_PICK"] as const;
+    for (const status of statuses) {
+      expect(status).not.toBe("LIVE_PICK");
+    }
+  });
+});

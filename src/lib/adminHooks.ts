@@ -446,3 +446,79 @@ export function useCoverageRefreshLog(limit = 10) {
     },
   });
 }
+
+// ============================================================
+// ODDS MONITOR — full audit view
+// ============================================================
+export type OddsMonitorLeague = {
+  id: string;
+  name: string;
+  tier: number;
+  is_synthetic: boolean;
+  has_live_odds: boolean;
+  playable: boolean;
+  fresh_odds_count: number;
+  stale_odds_count: number;
+  total_odds_count: number;
+  freshest_at: string | null;
+  bookmakers: string[];
+  markets: string[];
+};
+
+export function useOddsMonitor() {
+  return useQuery({
+    queryKey: ["odds-monitor"],
+    queryFn: async () => {
+      const [leaguesR, oddsR] = await Promise.all([
+        supabase.from("leagues").select("id, name, tier, is_synthetic, has_live_odds, playable").order("tier").order("name"),
+        supabase.from("match_odds").select("id, league_id, bookmaker, market, is_stale, fetched_at").order("fetched_at", { ascending: false }),
+      ]);
+      if (leaguesR.error) throw leaguesR.error;
+
+      const leagues = leaguesR.data as Array<{ id: string; name: string; tier: number; is_synthetic: boolean; has_live_odds: boolean; playable: boolean }>;
+      const odds = (oddsR.data || []) as Array<{ id: string; league_id: string | null; bookmaker: string; market: string; is_stale: boolean; fetched_at: string }>;
+
+      const oddsByLeague = new Map<string, typeof odds>();
+      for (const o of odds) {
+        if (!o.league_id) continue;
+        if (!oddsByLeague.has(o.league_id)) oddsByLeague.set(o.league_id, []);
+        oddsByLeague.get(o.league_id)!.push(o);
+      }
+
+      const result: OddsMonitorLeague[] = leagues.map((l) => {
+        const lo = oddsByLeague.get(l.id) || [];
+        const fresh = lo.filter((o) => !o.is_stale);
+        const stale = lo.filter((o) => o.is_stale);
+        const bookmakers = [...new Set(lo.map((o) => o.bookmaker))];
+        const markets = [...new Set(lo.map((o) => o.market))];
+        const freshestAt = fresh.length > 0 ? fresh[0].fetched_at : null;
+        return {
+          id: l.id,
+          name: l.name,
+          tier: l.tier,
+          is_synthetic: l.is_synthetic,
+          has_live_odds: l.has_live_odds,
+          playable: l.playable,
+          fresh_odds_count: fresh.length,
+          stale_odds_count: stale.length,
+          total_odds_count: lo.length,
+          freshest_at: freshestAt,
+          bookmakers,
+          markets,
+        };
+      });
+
+      return {
+        leagues: result,
+        totalOdds: odds.length,
+        totalFresh: odds.filter((o) => !o.is_stale).length,
+        totalStale: odds.filter((o) => o.is_stale).length,
+        uniqueBookmakers: [...new Set(odds.map((o) => o.bookmaker))],
+        uniqueMarkets: [...new Set(odds.map((o) => o.market))],
+      };
+    },
+  });
+}
+
+
+export { useAdminLeagues, useCoverageSummary, useLeagueTierSummary }
