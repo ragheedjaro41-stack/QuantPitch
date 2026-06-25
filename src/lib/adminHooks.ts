@@ -1017,3 +1017,144 @@ export function usePlayerSyncSummary() {
     },
   });
 }
+
+// ============================================================
+// AUTOMATION / CRON READINESS
+// ============================================================
+
+export type SyncJobStatus = {
+  slug: string;
+  name: string;
+  description: string;
+  edgeFunction: string;
+  logTable: string;
+  syncType: string | null;
+  apiKeyName: string;
+  cooldownSeconds: number;
+  recommendedCron: string;
+  recommendedInterval: string;
+  lastRun: string | null;
+  lastStatus: string | null;
+  lastError: string | null;
+  lastSyncedCount: number;
+  totalRuns: number;
+  totalErrors: number;
+  onCooldown: boolean;
+  cooldownRemaining: number;
+  hasApiKey: boolean | null;
+};
+
+export function useAutomationStatus() {
+  return useQuery({
+    queryKey: ["automation-status"],
+    refetchInterval: 10000,
+    queryFn: async () => {
+      const [apiLogsR, oddsLogsR, resultsLogsR, configR] = await Promise.all([
+        supabase
+          .from("api_football_sync_log")
+          .select("sync_type, started_at, status, synced_count, error_count, error_message")
+          .order("started_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("odds_sync_log")
+          .select("started_at, status, synced_count, error_message")
+          .order("started_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("results_sync_log")
+          .select("started_at, status, synced_count, settled_count, void_count, error_message")
+          .order("started_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("app_config")
+          .select("key, value")
+          .in("key", ["API_FOOTBALL_KEY", "ODDS_API_KEY"]),
+      ]);
+
+      const apiLogs = (apiLogsR.data || []) as Array<{
+        sync_type: string; started_at: string; status: string;
+        synced_count: number; error_count: number; error_message: string | null;
+      }>;
+      const oddsLogs = (oddsLogsR.data || []) as Array<{
+        started_at: string; status: string; synced_count: number; error_message: string | null;
+      }>;
+      const resultsLogs = (resultsLogsR.data || []) as Array<{
+        started_at: string; status: string; synced_count: number;
+        settled_count: number; void_count: number; error_message: string | null;
+      }>;
+      const configKeys = new Set(
+        ((configR.data || []) as Array<{ key: string; value: string }>)
+          .filter((c) => c.value && c.value.length > 0)
+          .map((c) => c.key)
+      );
+
+      function buildJob(
+        slug: string, name: string, description: string, edgeFunction: string,
+        logTable: string, syncType: string | null, apiKeyName: string,
+        cooldownSeconds: number, recommendedCron: string, recommendedInterval: string,
+        logs: Array<{ started_at: string; status: string; synced_count: number; error_message: string | null; error_count?: number }>,
+      ): SyncJobStatus {
+        const last = logs[0] || null;
+        const elapsed = last ? (Date.now() - new Date(last.started_at).getTime()) / 1000 : Infinity;
+        const remaining = Math.max(0, Math.ceil(cooldownSeconds - elapsed));
+        const errorRuns = logs.filter((l) => l.status === "failed" || l.status === "error");
+        return {
+          slug, name, description, edgeFunction, logTable, syncType, apiKeyName,
+          cooldownSeconds, recommendedCron, recommendedInterval,
+          lastRun: last?.started_at || null,
+          lastStatus: last?.status || null,
+          lastError: last?.error_message || null,
+          lastSyncedCount: last?.synced_count ?? 0,
+          totalRuns: logs.length,
+          totalErrors: errorRuns.length,
+          onCooldown: remaining > 0,
+          cooldownRemaining: remaining,
+          hasApiKey: configKeys.has(apiKeyName) ? true : null,
+        };
+      }
+
+      const apiByType = (type: string) => apiLogs.filter((l) => l.sync_type === type);
+
+      const jobs: SyncJobStatus[] = [
+        buildJob(
+          "sync-teams", "Teams", "Sync team rosters and metadata from API-Football",
+          "sync-teams", "api_football_sync_log", "teams", "API_FOOTBALL_KEY",
+          120, "0 6 * * 1", "Weekly (Monday 6am)",
+          apiByType("teams"),
+        ),
+        buildJob(
+          "sync-fixtures", "Fixtures", "Sync upcoming and recent match fixtures",
+          "sync-fixtures", "api_football_sync_log", "fixtures", "API_FOOTBALL_KEY",
+          120, "0 */6 * * *", "Every 6 hours",
+          apiByType("fixtures"),
+        ),
+        buildJob(
+          "sync-standings", "Standings", "Sync league standings and table positions",
+          "sync-standings", "api_football_sync_log", "standings", "API_FOOTBALL_KEY",
+          120, "30 */6 * * *", "Every 6 hours (offset)",
+          apiByType("standings"),
+        ),
+        buildJob(
+          "sync-players", "Players", "Sync player stats, ratings, and metadata",
+          "sync-players", "api_football_sync_log", "players", "API_FOOTBALL_KEY",
+          120, "0 4 * * *", "Daily (4am)",
+          apiByType("players"),
+        ),
+        buildJob(
+          "sync-results", "Results + Settlement", "Fetch confirmed results and settle markets",
+          "sync-results", "results_sync_log", null, "API_FOOTBALL_KEY",
+          120, "*/15 * * * *", "Every 15 minutes",
+          resultsLogs,
+        ),
+        buildJob(
+          "sync-odds", "Odds", "Sync live odds from The Odds API",
+          "sync-odds", "odds_sync_log", null, "ODDS_API_KEY",
+          120, "*/10 * * * *", "Every 10 minutes",
+          oddsLogs,
+        ),
+      ];
+
+      return { jobs };
+    },
+  });
+}

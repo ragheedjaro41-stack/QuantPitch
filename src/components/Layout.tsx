@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale, Zap, Menu, X, Rocket } from "lucide-react";
+import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale, Zap, Menu, X, Rocket, CalendarClock } from "lucide-react";
 
 const mainNav = [
   { to: "/",          label: "Dashboard",  icon: LayoutDashboard, end: true },
@@ -30,6 +30,7 @@ const adminNav = [
   { to: "/admin/settlement",            label: "Settlement",      icon: Scale },
   { to: "/admin/activation",            label: "Activation",      icon: ListChecks },
   { to: "/admin/certification",        label: "Certification",   icon: BadgeCheck },
+  { to: "/admin/automation",            label: "Automation",      icon: CalendarClock },
   { to: "/admin/readiness",            label: "Prod Readiness",  icon: Rocket },
 ];
 

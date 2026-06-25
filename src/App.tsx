@@ -29,6 +29,7 @@ import Settlement from "./pages/admin/Settlement";
 import ApiFootball from "./pages/admin/ApiFootball";
 import PlayerSync from "./pages/admin/PlayerSync";
 import ProductionReadiness from "./pages/admin/ProductionReadiness";
+import Automation from "./pages/admin/Automation";
 
 export default function App() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="admin/api-football" element={<ApiFootball />} />
         <Route path="admin/player-sync" element={<PlayerSync />} />
         <Route path="admin/readiness" element={<ProductionReadiness />} />
+        <Route path="admin/automation" element={<Automation />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

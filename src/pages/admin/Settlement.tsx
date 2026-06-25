@@ -715,6 +715,3 @@ export default function Settlement() {
     </div>
   );
 }
-
-
-export default Settlement
