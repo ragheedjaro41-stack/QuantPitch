@@ -623,7 +623,7 @@ export default function Settlement() {
             </p>
             <p className="text-xs text-slate-300">
               <strong className="text-white">4. No fake results.</strong>{" "}
-              Results come only from a provider with a valid API key. Missing key = no sync, no results, no settlement.
+              Results come only from API-Football via the API_FOOTBALL_KEY secret. Missing key = no sync, no results, no settlement.
             </p>
             <p className="text-xs text-slate-300">
               <strong className="text-white">5. Missing final score = skip.</strong>{" "}

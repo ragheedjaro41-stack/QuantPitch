@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
     // ── 2. Create sync log entry ──
     const { data: logEntry, error: logErr } = await supabase
       .from("results_sync_log")
-      .insert({ provider: "football-data-api", status: "running" })
+      .insert({ provider: "api-football", status: "running" })
       .select("id")
       .single();
 
@@ -118,11 +118,11 @@ Deno.serve(async (req: Request) => {
     };
 
     // ── 3. Check for results provider API key ──
-    const resultsApiKey = Deno.env.get("FOOTBALL_DATA_API_KEY");
+    const resultsApiKey = Deno.env.get("API_FOOTBALL_KEY");
     if (!resultsApiKey) {
       await finalizeLog("failed", {
         error_message:
-          "FOOTBALL_DATA_API_KEY secret not configured. No results fetched. No fake results created.",
+          "API_FOOTBALL_KEY secret not configured. No results fetched. No fake results created.",
         synced_count: 0,
         settled_count: 0,
         void_count: 0,
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
 
       return jsonResponse({
         error:
-          "FOOTBALL_DATA_API_KEY secret not configured. Add it via Supabase dashboard > Edge Functions > Secrets. No results were fetched and no fake results were created.",
+          "API_FOOTBALL_KEY secret not configured. Add it via Supabase dashboard > Edge Functions > Secrets. No results were fetched and no fake results were created.",
         synced: 0,
         settled: 0,
         provider_status: "missing_key",
@@ -323,7 +323,7 @@ Deno.serve(async (req: Request) => {
         went_to_penalties: wentToPen,
         match_status: matchStatus,
         competition_type: compType,
-        provider_source: "football-data-api",
+        provider_source: "api-football",
       };
 
       // Insert match result

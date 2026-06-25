@@ -22,7 +22,7 @@ function makeResult(overrides: Partial<MatchResult> = {}): MatchResult {
     went_to_penalties: false,
     match_status: "confirmed",
     competition_type: "league",
-    provider_source: "football-data-api",
+    provider_source: "api-football",
     confirmed_at: new Date().toISOString(),
     notes: null,
     ...overrides,

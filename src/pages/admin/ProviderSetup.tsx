@@ -12,8 +12,14 @@ import {
 
 const REQUIRED_SECRETS = [
   {
+    name: "API_FOOTBALL_KEY",
+    description: "API key for API-Football. Required for fetching match fixtures, results, and stats. Powers the sync-results edge function and settlement engine.",
+    role: "results",
+  },
+  {
     name: "ODDS_API_KEY",
-    description: "API key for The Odds API (the-odds-api.com). Required for live odds sync.",
+    description: "API key for The Odds API (the-odds-api.com). Required for live bookmaker odds sync. Powers the sync-odds edge function.",
+    role: "odds",
     provider: "the-odds-api",
   },
 ];
@@ -60,12 +66,19 @@ export default function ProviderSetup() {
       <div className="card p-5 mb-6 border border-warn/30 bg-warn/5">
         <div className="flex items-start gap-3">
           <ShieldAlert size={16} className="text-warn shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-bold text-warn">No API key = No LIVE_PICK</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Without a configured ODDS_API_KEY secret, the sync-odds edge function will return safely
-              without modifying any data. No league will have has_live_odds set to true. All picks remain
-              BLOCKED_PICK or DEMO_PICK.
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-warn">Provider Key Roles</p>
+            <p className="text-xs text-slate-300">
+              <strong className="text-white">API_FOOTBALL_KEY</strong> = Fixtures, results, and stats provider.
+              Required for sync-results and the settlement engine. Without it, no match results are fetched and no markets are settled.
+            </p>
+            <p className="text-xs text-slate-300">
+              <strong className="text-white">ODDS_API_KEY</strong> = Bookmaker odds provider.
+              Required for sync-odds and live odds. Without it, no league gets has_live_odds=true.
+              LIVE_PICK remains blocked until this key exists.
+            </p>
+            <p className="text-xs text-slate-400">
+              Both keys are read from secrets at runtime only. They are never hardcoded, never exposed in the frontend, and never printed in logs.
             </p>
           </div>
         </div>
@@ -75,16 +88,19 @@ export default function ProviderSetup() {
       <h2 className="text-sm font-bold text-white mb-3">Required Secrets</h2>
       <div className="space-y-3 mb-8">
         {REQUIRED_SECRETS.map((secret) => {
-          const provider = allProviders.find((p) => p.slug === secret.provider);
-          const isConfigured = provider?.status === "active" && provider?.last_success_at;
+          const provider = secret.provider ? allProviders.find((p) => p.slug === secret.provider) : null;
+          const isConfigured = provider ? provider.status === "active" && !!provider.last_success_at : false;
           return (
             <div key={secret.name} className="card p-4">
               <div className="flex items-center gap-3 mb-2">
-                <Key size={14} className={isConfigured ? "text-good" : "text-bad"} />
+                <Key size={14} className={isConfigured ? "text-good" : "text-slate-500"} />
                 <code className="text-sm font-bold text-white bg-base-700/60 px-2 py-0.5 rounded">
                   {secret.name}
                 </code>
-                {isConfigured ? (
+                <span className="text-xs text-slate-500 bg-base-700/40 px-1.5 py-0.5 rounded">
+                  {secret.role === "results" ? "Results / Settlement" : "Odds / LIVE_PICK"}
+                </span>
+                {secret.provider && (isConfigured ? (
                   <span className="inline-flex items-center gap-1 text-xs text-good font-semibold">
                     <CheckCircle size={11} /> Configured & working
                   </span>
@@ -92,7 +108,7 @@ export default function ProviderSetup() {
                   <span className="inline-flex items-center gap-1 text-xs text-bad font-semibold">
                     <XCircle size={11} /> Not configured
                   </span>
-                )}
+                ))}
               </div>
               <p className="text-xs text-slate-400">{secret.description}</p>
             </div>
