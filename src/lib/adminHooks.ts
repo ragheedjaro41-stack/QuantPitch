@@ -1,0 +1,400 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "./supabase";
+
+export type League = {
+  id: string;
+  name: string;
+  short_name: string;
+  country: string;
+  continent: string;
+  tier: number;
+  tier_label: string;
+  competition_type: string;
+  season: string;
+  active: boolean;
+  has_fixtures: boolean;
+  has_odds: boolean;
+  has_stats: boolean;
+  has_standings: boolean;
+  has_team_stats: boolean;
+  has_injury_news: boolean;
+  historical_depth_years: number;
+  fixture_coverage: number;
+  odds_coverage: number;
+  stats_coverage: number;
+  provider_flag: string;
+  playable: boolean;
+  notes: string | null;
+  logo_url: string | null;
+  created_at: string;
+};
+
+export type CupCompetition = {
+  id: string;
+  name: string;
+  short_name: string;
+  country: string;
+  continent: string;
+  competition_type: string;
+  current_season: string;
+  active: boolean;
+  has_groups: boolean;
+  has_two_legs: boolean;
+  tier_label: string;
+  has_fixtures: boolean;
+  has_odds: boolean;
+  has_stats: boolean;
+  provider_flag: string;
+  playable: boolean;
+  notes: string | null;
+};
+
+export type CupRound = {
+  id: string;
+  cup_id: string;
+  name: string;
+  round_number: number;
+  is_two_legs: boolean;
+  is_neutral_venue: boolean;
+};
+
+export type CupFixture = {
+  id: string;
+  cup_id: string;
+  round_id: string | null;
+  round_name: string;
+  home_team_name: string | null;
+  away_team_name: string | null;
+  match_date: string | null;
+  venue: string | null;
+  is_neutral_venue: boolean;
+  home_score: number | null;
+  away_score: number | null;
+  home_score_et: number | null;
+  away_score_et: number | null;
+  home_score_pen: number | null;
+  away_score_pen: number | null;
+  went_to_et: boolean;
+  went_to_penalties: boolean;
+  leg: number;
+  tie_id: string | null;
+  home_agg: number | null;
+  away_agg: number | null;
+  status: string;
+  winner_name: string | null;
+  season: string;
+};
+
+export type DataCoverage = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  fixture_coverage: number;
+  odds_coverage: number;
+  stats_coverage: number;
+  standings_coverage: number;
+  team_stats_coverage: number;
+  injury_news_coverage: number;
+  historical_depth_years: number;
+  provider_flags: Record<string, string>;
+  missing_data_flags: string[];
+  overall_score: number;
+  risk_level: string;
+  last_audited_at: string;
+};
+
+export type PredictionRule = {
+  id: string;
+  rule_name: string;
+  competition_types: string[];
+  applies_to: string[];
+  rule_description: string;
+  weight_modifier: number;
+  priority: number;
+  active: boolean;
+  category: string;
+};
+
+export type SafetyRule = {
+  id: string;
+  rule_name: string;
+  min_fixtures: number;
+  min_team_history_years: number;
+  min_stats_coverage: number;
+  min_odds_coverage: number;
+  min_settlement_coverage: number;
+  tier_applies_to: number[];
+  description: string;
+  consequence: string;
+  active: boolean;
+};
+
+export type TeamAlias = {
+  id: string;
+  team_id: string;
+  alias: string;
+  source: string;
+};
+
+// ============================================================
+// LEAGUES
+// ============================================================
+export function useAdminLeagues(filters?: { tier?: number; competition_type?: string; playable?: boolean }) {
+  return useQuery({
+    queryKey: ["admin-leagues", filters],
+    queryFn: async () => {
+      let q = supabase.from("leagues").select("*").order("tier").order("name");
+      if (filters?.tier !== undefined) q = q.eq("tier", filters.tier);
+      if (filters?.competition_type) q = q.eq("competition_type", filters.competition_type);
+      if (filters?.playable !== undefined) q = q.eq("playable", filters.playable);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as League[];
+    },
+  });
+}
+
+export function useLeagueTierSummary() {
+  return useQuery({
+    queryKey: ["league-tier-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("leagues").select("*");
+      if (error) throw error;
+      const leagues = data as League[];
+
+      const tiers = [
+        { tier: 1, label: "Tier 1", color: "#10B981" },
+        { tier: 2, label: "Tier 2", color: "#00D4FF" },
+        { tier: 3, label: "Tier 3", color: "#fbbf24" },
+        { tier: 4, label: "Tier 4", color: "#f87171" },
+      ];
+
+      return tiers.map((t) => {
+        const tierLeagues = leagues.filter((l) => l.tier === t.tier);
+        return {
+          ...t,
+          count: tierLeagues.length,
+          playable: tierLeagues.filter((l) => l.playable).length,
+          blocked: tierLeagues.filter((l) => !l.playable).length,
+          avgOdds: tierLeagues.length
+            ? Math.round(tierLeagues.reduce((s, l) => s + l.odds_coverage, 0) / tierLeagues.length)
+            : 0,
+          avgStats: tierLeagues.length
+            ? Math.round(tierLeagues.reduce((s, l) => s + l.stats_coverage, 0) / tierLeagues.length)
+            : 0,
+        };
+      });
+    },
+  });
+}
+
+// ============================================================
+// CUPS
+// ============================================================
+export function useAdminCups() {
+  return useQuery({
+    queryKey: ["admin-cups"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cup_competitions")
+        .select("*")
+        .order("competition_type")
+        .order("name");
+      if (error) throw error;
+      return data as CupCompetition[];
+    },
+  });
+}
+
+export function useCupFixtures(cupId?: string) {
+  return useQuery({
+    queryKey: ["cup-fixtures", cupId],
+    queryFn: async () => {
+      let q = supabase
+        .from("cup_fixtures")
+        .select("*")
+        .order("match_date", { ascending: false });
+      if (cupId) q = q.eq("cup_id", cupId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as CupFixture[];
+    },
+  });
+}
+
+export function useAllCupFixtures() {
+  return useQuery({
+    queryKey: ["all-cup-fixtures"],
+    queryFn: async () => {
+      const { data: fixtures, error: fe } = await supabase
+        .from("cup_fixtures")
+        .select("*")
+        .order("match_date", { ascending: false });
+      if (fe) throw fe;
+
+      const { data: cups, error: ce } = await supabase
+        .from("cup_competitions")
+        .select("id, name, short_name, country, competition_type");
+      if (ce) throw ce;
+
+      const cupMap = new Map((cups || []).map((c) => [c.id, c]));
+      return (fixtures as CupFixture[]).map((f) => ({
+        ...f,
+        cup: cupMap.get(f.cup_id),
+      }));
+    },
+  });
+}
+
+// ============================================================
+// DATA COVERAGE
+// ============================================================
+export function useDataCoverage(entityType?: string) {
+  return useQuery({
+    queryKey: ["data-coverage", entityType],
+    queryFn: async () => {
+      let q = supabase
+        .from("data_coverage")
+        .select("*")
+        .order("overall_score", { ascending: false });
+      if (entityType) q = q.eq("entity_type", entityType);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as DataCoverage[];
+    },
+  });
+}
+
+export function useCoverageSummary() {
+  return useQuery({
+    queryKey: ["coverage-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("data_coverage").select("*");
+      if (error) throw error;
+      const all = data as DataCoverage[];
+      return {
+        total: all.length,
+        low: all.filter((d) => d.risk_level === "low").length,
+        medium: all.filter((d) => d.risk_level === "medium").length,
+        high: all.filter((d) => d.risk_level === "high").length,
+        critical: all.filter((d) => d.risk_level === "critical").length,
+        avgScore: all.length
+          ? Math.round(all.reduce((s, d) => s + d.overall_score, 0) / all.length)
+          : 0,
+        missingOdds: all.filter((d) => d.missing_data_flags.includes("odds")).length,
+        missingStats: all.filter((d) => d.missing_data_flags.includes("stats")).length,
+        missingFixtures: all.filter((d) => d.missing_data_flags.includes("fixtures")).length,
+      };
+    },
+  });
+}
+
+// ============================================================
+// PREDICTION & SAFETY RULES
+// ============================================================
+export function usePredictionRules() {
+  return useQuery({
+    queryKey: ["prediction-rules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prediction_rules")
+        .select("*")
+        .order("category")
+        .order("priority");
+      if (error) throw error;
+      return data as PredictionRule[];
+    },
+  });
+}
+
+export function useSafetyRules() {
+  return useQuery({
+    queryKey: ["safety-rules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("safety_rules")
+        .select("*")
+        .order("rule_name");
+      if (error) throw error;
+      return data as SafetyRule[];
+    },
+  });
+}
+
+// ============================================================
+// TEAM ADMIN
+// ============================================================
+export function useAdminTeams() {
+  return useQuery({
+    queryKey: ["admin-teams"],
+    queryFn: async () => {
+      const { data: teams, error: te } = await supabase
+        .from("teams")
+        .select("*")
+        .order("name");
+      if (te) throw te;
+
+      const { data: aliases } = await supabase.from("team_aliases").select("*");
+      const aliasMap = new Map<string, TeamAlias[]>();
+      (aliases || []).forEach((a: TeamAlias) => {
+        if (!aliasMap.has(a.team_id)) aliasMap.set(a.team_id, []);
+        aliasMap.get(a.team_id)!.push(a);
+      });
+
+      return teams.map((t) => ({
+        ...t,
+        aliases: aliasMap.get(t.id) || [],
+      }));
+    },
+  });
+}
+
+export function usePromotionRelegation() {
+  return useQuery({
+    queryKey: ["promotion-relegation"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("*")
+        .or("promoted.eq.true,relegated.eq.true")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+// ============================================================
+// THIN LEAGUES (Tier 3-4 or not playable)
+// ============================================================
+export function useThinLeagues() {
+  return useQuery({
+    queryKey: ["thin-leagues"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leagues")
+        .select("*")
+        .or("tier.gte.3,playable.eq.false")
+        .order("tier")
+        .order("odds_coverage", { ascending: true });
+      if (error) throw error;
+      return data as League[];
+    },
+  });
+}
+
+export function useMissingProviderData() {
+  return useQuery({
+    queryKey: ["missing-provider-data"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("data_coverage")
+        .select("*")
+        .neq("missing_data_flags", "{}")
+        .order("overall_score", { ascending: true });
+      if (error) throw error;
+      return data as DataCoverage[];
+    },
+  });
+}
