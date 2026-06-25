@@ -9,7 +9,7 @@ import {
   useResultsSyncCooldown,
 } from "../../lib/adminHooks";
 import { PageHeader, Spinner } from "../../components/ui";
-import { CircleCheck as CheckCircle, CircleX as XCircle, CircleAlert as AlertCircle, Clock, Database, ShieldCheck, FileWarning, List, RefreshCw, Loader as Loader2 } from "lucide-react";
+import { CircleCheck as CheckCircle, CircleX as XCircle, CircleAlert as AlertCircle, Clock, Database, ShieldCheck, FileWarning, List, RefreshCw, Loader as Loader2, Info } from "lucide-react";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -164,6 +164,20 @@ export default function Settlement() {
         subtitle="Results verification, market settlement, and audit log"
       />
 
+      {/* Settlement source status note */}
+      <div className="card p-4 mb-6 border border-accent/20 bg-accent/5">
+        <div className="flex gap-3">
+          <Info size={16} className="text-accent shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-slate-200 leading-relaxed">
+              Current completed matches are settled from <span className="font-semibold text-warn">Internal Backfill</span>.
+              API-Football provider sync is active and will create <span className="font-semibold text-good">Provider Verified</span> rows
+              for future completed matches that do not already have results.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Results sync controls */}
       <div className="card p-5 mb-8 border border-base-600/50">
         <div className="flex items-center justify-between mb-4">
@@ -305,26 +319,38 @@ export default function Settlement() {
         </div>
       </div>
 
-      {/* Source breakdown */}
-      {summary?.by_source && (
-        <div className="flex flex-wrap gap-3 mb-8">
-          <div className="card p-3 flex items-center gap-3">
-            <SourceBadge source="api-football" />
-            <span className="font-mono text-lg font-bold text-white">{summary.by_source.provider_verified}</span>
-            <span className="text-xs text-slate-500">results</span>
-          </div>
-          <div className="card p-3 flex items-center gap-3">
+      {/* Source audit card */}
+      <h2 className="text-sm font-bold text-white mb-3">Settlement Source Audit</h2>
+      <div className="card overflow-hidden mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-base-700/40">
+          <div className="p-4 text-center">
             <SourceBadge source="internal_backfill" />
-            <span className="font-mono text-lg font-bold text-white">{summary.by_source.internal_backfill}</span>
-            <span className="text-xs text-slate-500">results</span>
+            <p className="font-mono text-2xl font-bold text-white mt-2">{summary?.by_source?.internal_backfill ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Internal Backfill</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Settled from existing DB scores</p>
           </div>
-          <div className="card p-3 flex items-center gap-3">
+          <div className="p-4 text-center">
+            <SourceBadge source="api-football" />
+            <p className="font-mono text-2xl font-bold text-white mt-2">{summary?.by_source?.provider_verified ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Provider Verified</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Live API-Football sync</p>
+          </div>
+          <div className="p-4 text-center">
             <SourceBadge source="manual" />
-            <span className="font-mono text-lg font-bold text-white">{summary.by_source.manual}</span>
-            <span className="text-xs text-slate-500">results</span>
+            <p className="font-mono text-2xl font-bold text-white mt-2">{summary?.by_source?.manual ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Manual Review</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Admin-entered results</p>
+          </div>
+          <div className="p-4 text-center">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap text-accent" style={{ backgroundColor: "#00D4FF15", border: "1px solid #00D4FF30" }}>
+              Next Sync
+            </span>
+            <p className="font-mono text-2xl font-bold text-accent mt-2">{pending.length}</p>
+            <p className="text-xs text-slate-500 mt-1">Eligible Matches</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Completed, awaiting provider result</p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Results Sync History */}
       <h2 className="text-sm font-bold text-white mb-3">Results Sync History</h2>
@@ -689,3 +715,6 @@ export default function Settlement() {
     </div>
   );
 }
+
+
+export default Settlement
