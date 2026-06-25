@@ -398,3 +398,51 @@ export function useMissingProviderData() {
     },
   });
 }
+
+// ============================================================
+// ODDS PROVIDERS + REFRESH LOG
+// ============================================================
+export type OddsProviderRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  api_endpoint: string | null;
+  last_ping_at: string | null;
+  last_success_at: string | null;
+  notes: string | null;
+};
+
+export function useOddsProviders() {
+  return useQuery({
+    queryKey: ["odds-providers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("odds_providers").select("*").order("name");
+      if (error) throw error;
+      return data as OddsProviderRow[];
+    },
+  });
+}
+
+export function useCoverageRefreshLog(limit = 10) {
+  return useQuery({
+    queryKey: ["coverage-refresh-log", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("coverage_refresh_log")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        triggered_by: string;
+        started_at: string;
+        finished_at: string | null;
+        leagues_refreshed: number | null;
+        status: string;
+        error_message: string | null;
+      }>;
+    },
+  });
+}

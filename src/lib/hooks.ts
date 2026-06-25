@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
-import { getAllLeaguePlayability, classifyMatchCompetition, buildCupContext, cupWeightModifier } from "./playability";
+import { getAllLeaguePlayability, classifyMatchCompetition, buildCupContext, cupWeightModifier, computeCupPickStatus } from "./playability";
 import type { PlayabilityResult, TopPlay } from "./playability";
+import { buildModelFlags } from "./modelFlags";
 import type { PredictionRule } from "./adminHooks";
 import type {
   Team,
@@ -585,6 +586,22 @@ export function useTopPlays() {
           confidence * (Math.max(oddsCov, 1) / 100) * (Math.max(statsCov, 1) / 100) * totalModifier * 100
         );
 
+        // Cup sample size gate: block cup picks if insufficient historical data
+        const isCupPick = cupCtx !== null;
+        const cupSample = isCupPick ? (cupCtx.went_to_et ? 20 : 0) : null; // placeholder: 0 sample until real data
+        const cupGate = isCupPick
+          ? computeCupPickStatus(cupSample, playability.pick_status)
+          : { pick_status: playability.pick_status, reason: null };
+
+        const finalPickStatus = cupGate.pick_status;
+        const modelFlags = buildModelFlags({
+          has_live_odds: playability.has_live_odds,
+          has_xg: false, // no xG feed connected
+          has_stats: statsCov >= 50,
+          has_settlement: statsCov >= 30,
+          cup_historical_sample: cupSample,
+        });
+
         return {
           match_id: m.id,
           home_team_name: homeTeam?.name ?? "Unknown",
@@ -603,11 +620,13 @@ export function useTopPlays() {
           confidence_cap: tierCap,
           pick,
           pick_label: pickLabel,
-          pick_status: playability.pick_status,
-          value_score: valueScore,
+          pick_status: finalPickStatus,
+          block_reason: cupGate.reason,
+          value_score: finalPickStatus === "LIVE_PICK" ? valueScore : 0,
           home_form_pts: homeForm,
           away_form_pts: awayForm,
           cup_context: cupCtx,
+          model_flags: modelFlags,
         } satisfies TopPlay;
       });
 

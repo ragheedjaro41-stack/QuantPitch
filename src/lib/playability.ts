@@ -1,5 +1,9 @@
 import { supabase } from "./supabase";
 import type { League, SafetyRule, DataCoverage } from "./adminHooks";
+import { buildModelFlags, cupMeetsSampleRequirement, MIN_CUP_FIXTURES } from "./modelFlags";
+import type { ModelFeatureFlags } from "./modelFlags";
+export type { ModelFeatureFlags };
+export { MIN_CUP_FIXTURES };
 
 // ============================================================
 // TYPES
@@ -17,6 +21,7 @@ export type PlayabilityResult = {
   pick_status: PickStatus;
   is_synthetic: boolean;
   has_live_odds: boolean;
+  model_flags: ModelFeatureFlags;
 };
 
 export type CupMatchContext = {
@@ -54,10 +59,12 @@ export type TopPlay = {
   pick: "home" | "away" | "draw";
   pick_label: string;
   pick_status: PickStatus;
+  block_reason: string | null;
   value_score: number;
   home_form_pts: number;
   away_form_pts: number;
   cup_context: CupMatchContext | null;
+  model_flags: ModelFeatureFlags;
 };
 
 // ============================================================
@@ -148,6 +155,10 @@ export async function computeLeaguePlayability(
 ): Promise<PlayabilityResult> {
   const is_synthetic = league.is_synthetic ?? false;
   const has_live_odds = league.has_live_odds ?? false;
+  const has_stats = (coverage?.stats_coverage ?? league.stats_coverage) >= 50;
+  const has_settlement = (coverage?.standings_coverage ?? league.fixture_coverage) >= 30;
+
+  const demoFlags = buildModelFlags({ has_live_odds: false, has_xg: false, has_stats: false, has_settlement: false });
 
   // Synthetic/demo leagues are always DEMO_PICK, never LIVE_PICK
   if (is_synthetic) {
@@ -161,6 +172,7 @@ export async function computeLeaguePlayability(
       pick_status: "DEMO_PICK",
       is_synthetic: true,
       has_live_odds: false,
+      model_flags: demoFlags,
     };
   }
 
@@ -176,6 +188,7 @@ export async function computeLeaguePlayability(
       pick_status: "BLOCKED_PICK",
       is_synthetic: false,
       has_live_odds: false,
+      model_flags: buildModelFlags({ has_live_odds: false, has_xg: false, has_stats, has_settlement }),
     };
   }
 
@@ -196,6 +209,7 @@ export async function computeLeaguePlayability(
         pick_status: "BLOCKED_PICK",
         is_synthetic: false,
         has_live_odds,
+        model_flags: buildModelFlags({ has_live_odds, has_xg: false, has_stats, has_settlement }),
       };
     }
     if (statsCov < rule.min_stats_coverage) {
@@ -209,6 +223,7 @@ export async function computeLeaguePlayability(
         pick_status: "BLOCKED_PICK",
         is_synthetic: false,
         has_live_odds,
+        model_flags: buildModelFlags({ has_live_odds, has_xg: false, has_stats, has_settlement }),
       };
     }
   }
@@ -225,6 +240,7 @@ export async function computeLeaguePlayability(
       pick_status: "BLOCKED_PICK",
       is_synthetic: false,
       has_live_odds,
+      model_flags: buildModelFlags({ has_live_odds, has_xg: false, has_stats, has_settlement }),
     };
   }
 
@@ -240,7 +256,29 @@ export async function computeLeaguePlayability(
     pick_status: "LIVE_PICK",
     is_synthetic: false,
     has_live_odds: true,
+    model_flags: buildModelFlags({ has_live_odds: true, has_xg: false, has_stats, has_settlement }),
   };
+}
+
+// ============================================================
+// CUP PICK GATE
+// Returns BLOCKED_PICK when a cup has insufficient historical data
+// ============================================================
+
+export function computeCupPickStatus(
+  cupHistoricalSample: number | null | undefined,
+  basePickStatus: PickStatus
+): { pick_status: PickStatus; reason: string | null } {
+  if (basePickStatus !== "LIVE_PICK") {
+    return { pick_status: basePickStatus, reason: null };
+  }
+  if (!cupMeetsSampleRequirement(cupHistoricalSample)) {
+    return {
+      pick_status: "BLOCKED_PICK",
+      reason: `Cup historical sample too small (${cupHistoricalSample ?? 0} < ${MIN_CUP_FIXTURES} required). ET/pen probability unavailable.`,
+    };
+  }
+  return { pick_status: "LIVE_PICK", reason: null };
 }
 
 // Returns a map of league_id → PlayabilityResult for all active leagues
@@ -309,6 +347,9 @@ export type CoverageRefreshResult = {
 };
 
 export async function runCoverageRefresh(): Promise<CoverageRefreshResult[]> {
+  // Use logged version so every refresh is tracked in coverage_refresh_log
+  await supabase.rpc("refresh_league_coverage_logged", { p_triggered_by: "manual" });
+  // Return detailed results from the base function for UI display
   const { data, error } = await supabase.rpc("refresh_league_coverage");
   if (error) throw error;
   return (data || []).map((r: any) => ({

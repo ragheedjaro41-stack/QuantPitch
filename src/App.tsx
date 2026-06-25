@@ -21,6 +21,7 @@ import PromotionRelegation from "./pages/admin/PromotionRelegation";
 import CupFixtures from "./pages/admin/CupFixtures";
 import AuditReport from "./pages/admin/AuditReport";
 import AliasQueue from "./pages/admin/AliasQueue";
+import Certification from "./pages/admin/Certification";
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="admin/cup-fixtures" element={<CupFixtures />} />
         <Route path="admin/audit" element={<AuditReport />} />
         <Route path="admin/alias-queue" element={<AliasQueue />} />
+        <Route path="admin/certification" element={<Certification />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
