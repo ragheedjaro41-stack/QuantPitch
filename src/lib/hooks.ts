@@ -17,20 +17,48 @@ import type {
   WCKnockoutMatch,
 } from "../types";
 
-export function usePrimaryLeague() {
+export type LeagueSummary = {
+  id: string;
+  name: string;
+  short_name: string;
+  tier: number;
+  competition_type: string;
+  has_live_odds: boolean;
+  fixture_coverage: number;
+  odds_coverage: number;
+  stats_coverage: number;
+  active: boolean;
+  playable: boolean;
+};
+
+export type LeagueStatus = "LIVE READY" | "BLOCKED" | "THIN" | "MISSING DATA";
+
+export function getLeagueStatus(l: LeagueSummary): LeagueStatus {
+  if (l.has_live_odds && l.fixture_coverage >= 80 && l.stats_coverage >= 50) return "LIVE READY";
+  if (l.fixture_coverage < 30 || l.stats_coverage < 20) return "MISSING DATA";
+  if (l.fixture_coverage < 60 || l.stats_coverage < 40) return "THIN";
+  return "BLOCKED";
+}
+
+export function useRealLeagues() {
   return useQuery({
-    queryKey: ["primary-league"],
+    queryKey: ["real-leagues"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leagues")
-        .select("id, name")
+        .select("id, name, short_name, tier, competition_type, has_live_odds, fixture_coverage, odds_coverage, stats_coverage, active, playable")
         .eq("is_synthetic", false)
-        .eq("name", "Premier League")
-        .maybeSingle();
+        .order("tier")
+        .order("name");
       if (error) throw error;
-      return data as { id: string; name: string } | null;
+      return (data ?? []).map((l) => ({
+        ...l,
+        fixture_coverage: Number(l.fixture_coverage),
+        odds_coverage: Number(l.odds_coverage),
+        stats_coverage: Number(l.stats_coverage),
+      })) as LeagueSummary[];
     },
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 }
 
@@ -54,30 +82,31 @@ export function useTeams() {
   });
 }
 
-export function useTeamStats() {
+export function useTeamStats(leagueId: string | null | undefined) {
   return useQuery({
-    queryKey: ["team-stats"],
+    queryKey: ["team-stats", leagueId],
     queryFn: async () => {
-      const { data: plLeague } = await supabase
-        .from("leagues")
-        .select("id")
-        .eq("name", "Premier League")
-        .eq("is_synthetic", false)
-        .maybeSingle();
-      const plId = plLeague?.id;
+      let teamsQ = supabase.from("teams").select("*").order("name");
+      let matchesQ = supabase.from("matches").select("*").eq("status", "completed");
 
-      const { data: teams, error: te } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("league_id", plId)
-        .order("name");
+      if (leagueId) {
+        teamsQ = teamsQ.eq("league_id", leagueId);
+        matchesQ = matchesQ.eq("league_id", leagueId);
+      } else {
+        const { data: synthLeagues } = await supabase.from("leagues").select("id").eq("is_synthetic", true);
+        const synthIds = (synthLeagues || []).map((l: { id: string }) => l.id);
+        teamsQ = teamsQ.not("league_id", "is", null);
+        matchesQ = matchesQ.not("league_id", "is", null);
+        if (synthIds.length > 0) {
+          for (const sid of synthIds) {
+            teamsQ = teamsQ.neq("league_id", sid);
+            matchesQ = matchesQ.neq("league_id", sid);
+          }
+        }
+      }
+
+      const [{ data: teams, error: te }, { data: matches, error: me }] = await Promise.all([teamsQ, matchesQ]);
       if (te) throw te;
-
-      const { data: matches, error: me } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("status", "completed")
-        .eq("league_id", plId);
       if (me) throw me;
 
       const stats: TeamWithStats[] = (teams as Team[]).map((t) => {
@@ -107,6 +136,7 @@ export function useTeamStats() {
       });
       return stats.sort((a, b) => b.points - a.points || b.goal_diff - a.goal_diff);
     },
+    enabled: leagueId !== undefined,
   });
 }
 
@@ -175,30 +205,34 @@ export function useTeamMatches(teamId: string | undefined) {
   });
 }
 
-export function usePlayers() {
+export function usePlayers(leagueId: string | null | undefined) {
   return useQuery({
-    queryKey: ["players"],
+    queryKey: ["players", leagueId],
     queryFn: async () => {
-      const { data: plLeague } = await supabase
-        .from("leagues")
-        .select("id")
-        .eq("name", "Premier League")
-        .eq("is_synthetic", false)
-        .maybeSingle();
-      const plId = plLeague?.id;
+      let teamsQ = supabase.from("teams").select("id, name, short_name, primary_color, logo_url");
 
-      const { data: plTeams } = await supabase
-        .from("teams")
-        .select("id, name, short_name, primary_color, logo_url")
-        .eq("league_id", plId);
+      if (leagueId) {
+        teamsQ = teamsQ.eq("league_id", leagueId);
+      } else {
+        const { data: synthLeagues } = await supabase.from("leagues").select("id").eq("is_synthetic", true);
+        const synthIds = (synthLeagues || []).map((l: { id: string }) => l.id);
+        teamsQ = teamsQ.not("league_id", "is", null);
+        if (synthIds.length > 0) {
+          for (const sid of synthIds) {
+            teamsQ = teamsQ.neq("league_id", sid);
+          }
+        }
+      }
 
-      const teamMap = new Map((plTeams || []).map((t) => [t.id, t]));
-      const plTeamIds = [...teamMap.keys()];
+      const { data: teamRows } = await teamsQ;
+      const teamMap = new Map((teamRows || []).map((t) => [t.id, t]));
+      const teamIds = [...teamMap.keys()];
+      if (teamIds.length === 0) return [] as PlayerWithTeam[];
 
       const { data: players, error } = await supabase
         .from("players")
         .select("*")
-        .in("team_id", plTeamIds)
+        .in("team_id", teamIds)
         .order("rating", { ascending: false });
       if (error) throw error;
 
@@ -207,6 +241,7 @@ export function usePlayers() {
         team: teamMap.get(p.team_id),
       })) as PlayerWithTeam[];
     },
+    enabled: leagueId !== undefined,
   });
 }
 
@@ -233,23 +268,26 @@ export function usePlayer(id: string | undefined) {
   });
 }
 
-export function useMatches() {
+export function useMatches(leagueId: string | null | undefined) {
   return useQuery({
-    queryKey: ["matches"],
+    queryKey: ["matches", leagueId],
     queryFn: async () => {
-      const { data: plLeague } = await supabase
-        .from("leagues")
-        .select("id")
-        .eq("name", "Premier League")
-        .eq("is_synthetic", false)
-        .maybeSingle();
-      const plId = plLeague?.id;
+      let matchesQ = supabase.from("matches").select("*").order("match_date", { ascending: false });
 
-      const { data: matches, error } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("league_id", plId)
-        .order("match_date", { ascending: false });
+      if (leagueId) {
+        matchesQ = matchesQ.eq("league_id", leagueId);
+      } else {
+        const { data: synthLeagues } = await supabase.from("leagues").select("id").eq("is_synthetic", true);
+        const synthIds = (synthLeagues || []).map((l: { id: string }) => l.id);
+        matchesQ = matchesQ.not("league_id", "is", null);
+        if (synthIds.length > 0) {
+          for (const sid of synthIds) {
+            matchesQ = matchesQ.neq("league_id", sid);
+          }
+        }
+      }
+
+      const { data: matches, error } = await matchesQ;
       if (error) throw error;
 
       const teamIds = new Set<string>();
@@ -257,6 +295,8 @@ export function useMatches() {
         teamIds.add(m.home_team_id);
         teamIds.add(m.away_team_id);
       });
+
+      if (teamIds.size === 0) return [] as MatchWithTeams[];
 
       const { data: teams } = await supabase
         .from("teams")
@@ -270,6 +310,7 @@ export function useMatches() {
         away_team: teamMap.get(m.away_team_id),
       })) as MatchWithTeams[];
     },
+    enabled: leagueId !== undefined,
   });
 }
 
@@ -459,23 +500,34 @@ export function useWorldCupTopScorers() {
   });
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(leagueId: string | null | undefined) {
   return useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: ["dashboard-stats", leagueId],
     queryFn: async () => {
-      const { data: plLeague } = await supabase
-        .from("leagues")
-        .select("id")
-        .eq("name", "Premier League")
-        .eq("is_synthetic", false)
-        .maybeSingle();
-      const plId = plLeague?.id;
+      let teamsQ = supabase.from("teams").select("id, name, short_name, primary_color, logo_url");
+      let playersQ = supabase.from("players").select("*");
+      let matchesQ = supabase.from("matches").select("*").eq("status", "completed");
 
-      const [teamsR, playersR, matchesR] = await Promise.all([
-        supabase.from("teams").select("id, name, short_name, primary_color, logo_url").eq("league_id", plId),
-        supabase.from("players").select("*").not("external_id", "is", null).eq("league_id", plId),
-        supabase.from("matches").select("*").eq("status", "completed").eq("league_id", plId),
-      ]);
+      if (leagueId) {
+        teamsQ = teamsQ.eq("league_id", leagueId);
+        playersQ = playersQ.eq("league_id", leagueId);
+        matchesQ = matchesQ.eq("league_id", leagueId);
+      } else {
+        const { data: synthLeagues } = await supabase.from("leagues").select("id").eq("is_synthetic", true);
+        const synthIds = (synthLeagues || []).map((l: { id: string }) => l.id);
+        teamsQ = teamsQ.not("league_id", "is", null);
+        playersQ = playersQ.not("league_id", "is", null);
+        matchesQ = matchesQ.not("league_id", "is", null);
+        if (synthIds.length > 0) {
+          for (const sid of synthIds) {
+            teamsQ = teamsQ.neq("league_id", sid);
+            playersQ = playersQ.neq("league_id", sid);
+            matchesQ = matchesQ.neq("league_id", sid);
+          }
+        }
+      }
+
+      const [teamsR, playersR, matchesR] = await Promise.all([teamsQ, playersQ, matchesQ]);
 
       const teams = teamsR.data as Pick<Team, "id" | "name" | "short_name" | "primary_color" | "logo_url">[];
       const teamMap = new Map(teams.map((t) => [t.id, t]));

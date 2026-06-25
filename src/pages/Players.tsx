@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
-import { usePlayers } from "../lib/hooks";
-import { PageHeader, Spinner, ErrorState, TeamBadge, EmptyState } from "../components/ui";
+import { usePlayers, useRealLeagues, getLeagueStatus } from "../lib/hooks";
+import { PageHeader, Spinner, ErrorState, TeamBadge, EmptyState, LeagueSelector, LeagueStatusBadge } from "../components/ui";
 import { positionColor, positionLabel, ratingColor } from "../lib/utils";
 import type { PlayerWithTeam } from "../types";
 
@@ -20,7 +20,9 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 const POSITIONS = ["ALL", "GK", "DEF", "MID", "FWD"] as const;
 
 export default function Players() {
-  const { data, isLoading, isError } = usePlayers();
+  const [leagueId, setLeagueId] = useState<string | null>(null);
+  const { data: leagues } = useRealLeagues();
+  const { data, isLoading, isError } = usePlayers(leagueId);
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState<string>("ALL");
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
@@ -57,111 +59,124 @@ export default function Players() {
     return list;
   }, [data, search, posFilter, teamFilter, sortBy]);
 
-  if (isLoading) return <Spinner />;
-  if (isError || !data) return <ErrorState message="Failed to load players" />;
+  const selectedLeague = leagues?.find((l) => l.id === leagueId);
+  const realCount = data?.filter((p) => p.external_id).length ?? 0;
+  const subtitle = selectedLeague
+    ? `${realCount > 0 ? realCount : ""} ${selectedLeague.name} players`.trim()
+    : realCount > 0
+      ? `${realCount} players across all leagues`
+      : "Player data syncing soon";
 
-  const realCount = data.filter((p) => p.external_id).length;
+  if (isLoading && !leagues) return <Spinner />;
 
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
-      <PageHeader
-        title="Players"
-        subtitle={realCount > 0 ? `${realCount} Premier League players` : "Player data syncing soon"}
-      />
-
-      {/* Search and filter controls */}
-      <div className="flex flex-col gap-3 mb-6">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search players..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10 w-full"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-              showFilters ? "bg-accent/10 text-accent border border-accent/20" : "bg-base-700/50 text-slate-400 hover:text-white"
-            }`}
-          >
-            <SlidersHorizontal size={16} />
-            <span className="hidden sm:inline">Filters</span>
-          </button>
-        </div>
-
-        {/* Position pills -- always visible */}
-        <div className="flex gap-2 flex-wrap">
-          {POSITIONS.map((pos) => (
-            <button
-              key={pos}
-              onClick={() => setPosFilter(pos)}
-              className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
-                posFilter === pos
-                  ? "bg-accent text-base-900 shadow-sm shadow-accent/20"
-                  : "bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700"
-              }`}
-            >
-              {pos === "ALL" ? "All" : positionLabel(pos)}
-            </button>
-          ))}
-        </div>
-
-        {/* Expandable filters */}
-        {showFilters && (
-          <div className="card p-4 flex flex-col sm:flex-row gap-4 animate-in fade-in duration-200">
-            <div className="flex-1">
-              <label className="text-xs font-medium text-slate-500 mb-1.5 block">Team</label>
-              <div className="relative">
-                <select
-                  value={teamFilter}
-                  onChange={(e) => setTeamFilter(e.target.value)}
-                  className="input w-full appearance-none pr-8"
-                >
-                  <option value="ALL">All Teams</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              </div>
-            </div>
-            <div className="flex-1">
-              <label className="text-xs font-medium text-slate-500 mb-1.5 block">Sort by</label>
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortKey)}
-                  className="input w-full appearance-none pr-8"
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.key} value={o.key}>{o.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              </div>
-            </div>
+      <PageHeader title="Players" subtitle={subtitle}>
+        {leagues && (
+          <div className="flex items-center gap-3">
+            {selectedLeague && <LeagueStatusBadge status={getLeagueStatus(selectedLeague)} />}
+            <LeagueSelector leagues={leagues} selected={leagueId} onChange={(id) => { setLeagueId(id); setTeamFilter("ALL"); }} />
           </div>
         )}
-      </div>
+      </PageHeader>
 
-      {/* Results count */}
-      <p className="text-xs text-slate-500 mb-4">
-        Showing {filtered.length} of {data.length} players
-        {sortBy !== "rating" && <span> &middot; Sorted by {SORT_OPTIONS.find((s) => s.key === sortBy)?.label}</span>}
-      </p>
-
-      {filtered.length === 0 ? (
-        <EmptyState message="No players match your filters" />
+      {isLoading ? (
+        <Spinner />
+      ) : isError || !data ? (
+        <ErrorState message="Failed to load players" />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((p) => (
-            <PlayerCard key={p.id} player={p} sortBy={sortBy} />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-3 mb-6">
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search players..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="input pl-10 w-full"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                  showFilters ? "bg-accent/10 text-accent border border-accent/20" : "bg-base-700/50 text-slate-400 hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal size={16} />
+                <span className="hidden sm:inline">Filters</span>
+              </button>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {POSITIONS.map((pos) => (
+                <button
+                  key={pos}
+                  onClick={() => setPosFilter(pos)}
+                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
+                    posFilter === pos
+                      ? "bg-accent text-base-900 shadow-sm shadow-accent/20"
+                      : "bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700"
+                  }`}
+                >
+                  {pos === "ALL" ? "All" : positionLabel(pos)}
+                </button>
+              ))}
+            </div>
+
+            {showFilters && (
+              <div className="card p-4 flex flex-col sm:flex-row gap-4 animate-in fade-in duration-200">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 block">Team</label>
+                  <div className="relative">
+                    <select
+                      value={teamFilter}
+                      onChange={(e) => setTeamFilter(e.target.value)}
+                      className="input w-full appearance-none pr-8"
+                    >
+                      <option value="ALL">All Teams</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-slate-500 mb-1.5 block">Sort by</label>
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as SortKey)}
+                      className="input w-full appearance-none pr-8"
+                    >
+                      {SORT_OPTIONS.map((o) => (
+                        <option key={o.key} value={o.key}>{o.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-slate-500 mb-4">
+            Showing {filtered.length} of {data.length} players
+            {sortBy !== "rating" && <span> &middot; Sorted by {SORT_OPTIONS.find((s) => s.key === sortBy)?.label}</span>}
+          </p>
+
+          {filtered.length === 0 ? (
+            <EmptyState message="No players match your filters" />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((p) => (
+                <PlayerCard key={p.id} player={p} sortBy={sortBy} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

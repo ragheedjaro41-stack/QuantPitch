@@ -5,7 +5,7 @@ import { useTeamStats } from "../../lib/hooks";
 
 export default function PromotionRelegation() {
   const { data: leagues, isLoading: lLoading } = useAdminLeagues({ competition_type: "domestic_league" });
-  const { data: teamStats, isLoading: tLoading } = useTeamStats();
+  const { data: teamStats, isLoading: tLoading } = useTeamStats(null);
 
   const isLoading = lLoading || tLoading;
   if (isLoading) return <Spinner />;

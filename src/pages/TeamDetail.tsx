@@ -9,7 +9,7 @@ export default function TeamDetail() {
   const { data: team, isLoading: teamLoading } = useTeam(id);
   const { data: players, isLoading: playersLoading } = useTeamPlayers(id);
   const { data: matches, isLoading: matchesLoading } = useTeamMatches(id);
-  const { data: allStats } = useTeamStats();
+  const { data: allStats } = useTeamStats(team?.league_id ?? null);
 
   if (teamLoading) return <Spinner />;
   if (!team) return <ErrorState message="Team not found" />;
