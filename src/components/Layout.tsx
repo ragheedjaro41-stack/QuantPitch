@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy } from "lucide-react";
+import { LayoutDashboard, Shield, Users, Trophy, Globe } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/teams", label: "Teams", icon: Shield, end: false },
   { to: "/players", label: "Players", icon: Users, end: false },
   { to: "/matches", label: "Matches", icon: Trophy, end: false },
+  { to: "/world-cup", label: "World Cup", icon: Globe, end: false },
 ];
 
 export default function Layout() {
@@ -40,12 +41,8 @@ export default function Layout() {
         </nav>
 
         <div className="px-6 py-4 border-t border-base-700">
-          <p className="text-xs text-slate-500">
-            Season 2025
-          </p>
-          <p className="text-xs text-slate-600 mt-0.5">
-            6 teams · 60 players
-          </p>
+          <p className="text-xs text-slate-500">Season 2025 · WC 2026</p>
+          <p className="text-xs text-slate-600 mt-0.5">22 teams · 156 players</p>
         </div>
       </aside>
 

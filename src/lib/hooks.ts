@@ -9,6 +9,8 @@ import type {
   PlayerWithTeam,
   MatchWithTeams,
   MatchEventWithPlayer,
+  WCGroup,
+  WCKnockoutMatch,
 } from "../types";
 
 export function useTeams() {
@@ -276,6 +278,128 @@ export function useMatchEvents(matchId: string | undefined) {
       })) as MatchEventWithPlayer[];
     },
     enabled: !!matchId,
+  });
+}
+
+export function useWorldCupGroups() {
+  return useQuery({
+    queryKey: ["wc-groups"],
+    queryFn: async () => {
+      const { data: teams, error: te } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("competition", "worldcup");
+      if (te) throw te;
+
+      const { data: matches, error: me } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("competition", "worldcup")
+        .eq("stage", "group")
+        .eq("status", "completed");
+      if (me) throw me;
+
+      const groupNames = ["A", "B", "C", "D"];
+      const groups: WCGroup[] = groupNames.map((g) => {
+        const groupMatches = (matches as Match[]).filter((m) => m.group_name === g);
+        const teamIds = new Set<string>();
+        groupMatches.forEach((m) => {
+          teamIds.add(m.home_team_id);
+          teamIds.add(m.away_team_id);
+        });
+        const groupTeams = (teams as Team[]).filter((t) => teamIds.has(t.id));
+
+        const stats: TeamWithStats[] = groupTeams.map((t) => {
+          const tm = groupMatches.filter(
+            (m) => m.home_team_id === t.id || m.away_team_id === t.id
+          );
+          let won = 0, drawn = 0, lost = 0, gf = 0, ga = 0;
+          for (const m of tm) {
+            const isHome = m.home_team_id === t.id;
+            const scored = isHome ? m.home_score : m.away_score;
+            const conceded = isHome ? m.away_score : m.home_score;
+            gf += scored; ga += conceded;
+            if (scored > conceded) won++;
+            else if (scored === conceded) drawn++;
+            else lost++;
+          }
+          return {
+            ...t,
+            played: tm.length,
+            won, drawn, lost,
+            goals_for: gf,
+            goals_against: ga,
+            goal_diff: gf - ga,
+            points: won * 3 + drawn,
+          };
+        });
+        return {
+          name: g,
+          teams: stats.sort((a, b) => b.points - a.points || b.goal_diff - a.goal_diff),
+        };
+      });
+      return groups;
+    },
+  });
+}
+
+export function useWorldCupKnockout() {
+  return useQuery({
+    queryKey: ["wc-knockout"],
+    queryFn: async () => {
+      const { data: matches, error: me } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("competition", "worldcup")
+        .neq("stage", "group")
+        .order("match_date");
+      if (me) throw me;
+
+      const teamIds = new Set<string>();
+      (matches as Match[]).forEach((m) => {
+        teamIds.add(m.home_team_id);
+        teamIds.add(m.away_team_id);
+      });
+
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, name, short_name, primary_color")
+        .in("id", [...teamIds]);
+
+      const teamMap = new Map((teams || []).map((t) => [t.id, t]));
+      return (matches as Match[]).map((m) => ({
+        ...m,
+        home_team: teamMap.get(m.home_team_id),
+        away_team: teamMap.get(m.away_team_id),
+      })) as WCKnockoutMatch[];
+    },
+  });
+}
+
+export function useWorldCupTopScorers() {
+  return useQuery({
+    queryKey: ["wc-top-scorers"],
+    queryFn: async () => {
+      const { data: players, error } = await supabase
+        .from("players")
+        .select("*")
+        .eq("competition", "worldcup")
+        .order("goals", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+
+      const teamIds = [...new Set((players as Player[]).map((p) => p.team_id))];
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, name, short_name, primary_color")
+        .in("id", teamIds);
+
+      const teamMap = new Map((teams || []).map((t) => [t.id, t]));
+      return (players as Player[]).map((p) => ({
+        ...p,
+        team: teamMap.get(p.team_id),
+      })) as PlayerWithTeam[];
+    },
   });
 }
 

@@ -7,6 +7,7 @@ export type Team = {
   founded: number;
   primary_color: string;
   logo_url: string | null;
+  competition: string;
 };
 
 export type Player = {
@@ -24,6 +25,7 @@ export type Player = {
   appearances: number;
   rating: number;
   photo_url: string | null;
+  competition: string;
 };
 
 export type Match = {
@@ -36,6 +38,9 @@ export type Match = {
   away_score: number;
   status: string;
   round: number;
+  competition: string;
+  stage: string | null;
+  group_name: string | null;
 };
 
 export type MatchEvent = {
@@ -70,4 +75,13 @@ export type MatchWithTeams = Match & {
 
 export type MatchEventWithPlayer = MatchEvent & {
   player: Pick<Player, "id" | "name"> | null;
+};
+
+export type WCGroup = {
+  name: string;
+  teams: TeamWithStats[];
+};
+
+export type WCKnockoutMatch = MatchWithTeams & {
+  stage: string;
 };

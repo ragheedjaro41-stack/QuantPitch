@@ -7,6 +7,7 @@ import Players from "./pages/Players";
 import PlayerDetail from "./pages/PlayerDetail";
 import Matches from "./pages/Matches";
 import MatchDetail from "./pages/MatchDetail";
+import WorldCup from "./pages/WorldCup";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="players/:id" element={<PlayerDetail />} />
         <Route path="matches" element={<Matches />} />
         <Route path="matches/:id" element={<MatchDetail />} />
+        <Route path="world-cup" element={<WorldCup />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

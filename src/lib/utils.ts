@@ -16,7 +16,7 @@ export function formatTime(dateStr: string): string {
 export function positionColor(position: string): string {
   if (position === "GK") return "#fbbf24";
   if (["CB", "RB", "LB"].includes(position)) return "#10B981";
-  if (["CM", "CDM", "CAM"].includes(position)) return "#00D4FF";
+  if (["CM", "CDM", "CAM", "AM"].includes(position)) return "#00D4FF";
   if (["RW", "LW", "ST", "CF"].includes(position)) return "#f87171";
   return "#a78bfa";
 }
