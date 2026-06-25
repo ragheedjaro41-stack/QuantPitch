@@ -56,14 +56,14 @@ function MatchCard({ match }: { match: WCKnockoutMatch }) {
 
 function GroupTable({ group }: { group: { name: string; teams: TeamWithStats[] } }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-x-auto">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-base-700 bg-base-700/20">
         <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 border border-accent/30 text-xs font-bold text-accent font-mono">
           {group.name}
         </span>
         <span className="text-sm font-semibold text-white">Group {group.name}</span>
       </div>
-      <table className="w-full">
+      <table className="w-full min-w-[600px]">
         <thead>
           <tr className="border-b border-base-700/40">
             <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-6">#</th>

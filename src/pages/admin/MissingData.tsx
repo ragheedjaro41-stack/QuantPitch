@@ -110,8 +110,8 @@ export default function MissingData() {
       </div>
 
       {/* Main table */}
-      <div className="card overflow-hidden mb-8">
-        <table className="w-full">
+      <div className="card overflow-x-auto mb-8">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-base-700 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Entity</th>

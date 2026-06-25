@@ -100,6 +100,8 @@ export default function Players() {
               </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
+                aria-label={showFilters ? "Hide filters" : "Show filters"}
+                aria-expanded={showFilters}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
                   showFilters ? "bg-accent/10 text-accent border border-accent/20" : "bg-base-700/50 text-slate-400 hover:text-white"
                 }`}

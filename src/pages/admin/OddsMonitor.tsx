@@ -241,8 +241,8 @@ export default function OddsMonitor() {
 
       {/* Trusted markets audit */}
       <h2 className="text-sm font-bold text-white mb-3">Market Normalization Audit</h2>
-      <div className="card overflow-hidden mb-6">
-        <table className="w-full">
+      <div className="card overflow-x-auto mb-6">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Market Key</th>
@@ -282,14 +282,14 @@ export default function OddsMonitor() {
 
       {/* Sync log */}
       <h2 className="text-sm font-bold text-white mb-3">Sync History</h2>
-      <div className="card overflow-hidden mb-6">
+      <div className="card overflow-x-auto mb-6">
         {!syncLog || syncLog.length === 0 ? (
           <div className="p-6 text-center">
             <List size={20} className="text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No sync runs recorded yet</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-40">Started</th>
@@ -401,8 +401,8 @@ export default function OddsMonitor() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">League</th>
@@ -457,8 +457,8 @@ export default function OddsMonitor() {
 
       {/* Blocked leagues */}
       <h2 className="text-sm font-bold text-white mt-8 mb-3">Why Each League Is Blocked</h2>
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">League</th>

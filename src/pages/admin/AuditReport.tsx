@@ -332,8 +332,8 @@ export default function AuditReport() {
 
       {/* Full matrix */}
       <h2 className="text-lg font-semibold text-white mb-4">Full Integration Matrix</h2>
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-40">Category</th>

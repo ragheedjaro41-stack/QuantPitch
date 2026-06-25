@@ -338,7 +338,7 @@ export default function ApiFootball() {
       <h2 className="text-sm font-bold text-white mb-3">
         Provider Missing Data ({allMissing.length})
       </h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {allMissing.length === 0 ? (
           <div className="p-6 text-center">
             <CheckCircle size={20} className="text-good mx-auto mb-2" />
@@ -348,7 +348,7 @@ export default function ApiFootball() {
             </p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -398,7 +398,7 @@ export default function ApiFootball() {
 
       {/* Sync history */}
       <h2 className="text-sm font-bold text-white mb-3">Sync History</h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {allSyncLogs.length === 0 ? (
           <div className="p-6 text-center">
             <RefreshCw size={20} className="text-slate-600 mx-auto mb-2" />
@@ -407,7 +407,7 @@ export default function ApiFootball() {
             </p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">

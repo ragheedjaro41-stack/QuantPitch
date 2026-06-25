@@ -120,8 +120,8 @@ export default function AdminTiers() {
       <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
         <AlertTriangle size={18} className="text-warn" /> Safety Rule Thresholds
       </h2>
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-base-700 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Rule</th>

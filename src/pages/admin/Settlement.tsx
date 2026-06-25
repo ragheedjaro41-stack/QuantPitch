@@ -354,14 +354,14 @@ export default function Settlement() {
 
       {/* Results Sync History */}
       <h2 className="text-sm font-bold text-white mb-3">Results Sync History</h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {allSyncLogs.length === 0 ? (
           <div className="p-6 text-center">
             <RefreshCw size={20} className="text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No results sync attempts yet. Click "Run Results Sync" to begin.</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-28">When</th>
@@ -417,7 +417,7 @@ export default function Settlement() {
       <h2 className="text-sm font-bold text-white mb-3">
         Pending Matches ({pending.length} awaiting results)
       </h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {pending.length === 0 ? (
           <div className="p-6 text-center">
             <CheckCircle size={20} className="text-good mx-auto mb-2" />
@@ -428,7 +428,7 @@ export default function Settlement() {
             </p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Match</th>
@@ -470,14 +470,14 @@ export default function Settlement() {
       <h2 className="text-sm font-bold text-white mb-3">
         Settled Matches ({confirmedResults.length})
       </h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {confirmedResults.length === 0 ? (
           <div className="p-6 text-center">
             <List size={20} className="text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No matches settled yet</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Match ID</th>
@@ -530,8 +530,8 @@ export default function Settlement() {
           <h2 className="text-sm font-bold text-white mb-3">
             Void / Review ({voidResults.length + reviewResults.length})
           </h2>
-          <div className="card overflow-hidden mb-8">
-            <table className="w-full">
+          <div className="card overflow-x-auto mb-8">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="border-b border-base-700/60 bg-base-700/20">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Match ID</th>
@@ -567,8 +567,8 @@ export default function Settlement() {
 
       {/* Settlement rules by market */}
       <h2 className="text-sm font-bold text-white mb-3">Settlement Rules by Market</h2>
-      <div className="card overflow-hidden mb-8">
-        <table className="w-full">
+      <div className="card overflow-x-auto mb-8">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-base-700/60 bg-base-700/20">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Market</th>
@@ -629,14 +629,14 @@ export default function Settlement() {
 
       {/* Recent settlement log */}
       <h2 className="text-sm font-bold text-white mb-3">Recent Settlement Log</h2>
-      <div className="card overflow-hidden mb-8">
+      <div className="card overflow-x-auto mb-8">
         {allLogs.length === 0 ? (
           <div className="p-6 text-center">
             <List size={20} className="text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No settlement entries yet. Run a results sync to begin.</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-base-700/60 bg-base-700/20">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-28">Settled</th>

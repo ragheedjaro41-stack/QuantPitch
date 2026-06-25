@@ -22,12 +22,12 @@ export default function TeamDetail() {
       <BackLink to="/teams" label="All Teams" />
 
       {/* Team header */}
-      <div className="card p-6 mb-6">
-        <div className="flex items-start gap-5">
+      <div className="card p-5 sm:p-6 mb-6">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
           <TeamBadge short_name={team.short_name} color={team.primary_color} size="lg" logo_url={team.logo_url} />
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-white">{team.name}</h1>
-            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-400">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{team.name}</h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-slate-400">
               <span className="flex items-center gap-1.5">
                 <MapPin size={14} /> {team.city}
               </span>
@@ -39,25 +39,35 @@ export default function TeamDetail() {
               </span>
             </div>
           </div>
-          {teamStat && (
-            <div className="flex gap-6">
-              <div className="text-center">
-                <p className="stat-label">Points</p>
-                <p className="font-mono text-2xl font-bold text-accent mt-1">{teamStat.points}</p>
-              </div>
-              <div className="text-center">
-                <p className="stat-label">Played</p>
-                <p className="font-mono text-2xl font-bold text-white mt-1">{teamStat.played}</p>
-              </div>
-              <div className="text-center">
-                <p className="stat-label">GD</p>
-                <p className={`font-mono text-2xl font-bold mt-1 ${teamStat.goal_diff > 0 ? "text-good" : teamStat.goal_diff < 0 ? "text-bad" : "text-slate-300"}`}>
-                  {teamStat.goal_diff > 0 ? "+" : ""}{teamStat.goal_diff}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
+        {teamStat && (
+          <div className="flex gap-4 sm:gap-6 mt-4 pt-4 border-t border-base-700/40">
+            <div className="text-center flex-1">
+              <p className="stat-label">Points</p>
+              <p className="font-mono text-xl sm:text-2xl font-bold text-accent mt-1">{teamStat.points}</p>
+            </div>
+            <div className="text-center flex-1">
+              <p className="stat-label">Played</p>
+              <p className="font-mono text-xl sm:text-2xl font-bold text-white mt-1">{teamStat.played}</p>
+            </div>
+            <div className="text-center flex-1">
+              <p className="stat-label">GD</p>
+              <p className={`font-mono text-xl sm:text-2xl font-bold mt-1 ${teamStat.goal_diff > 0 ? "text-good" : teamStat.goal_diff < 0 ? "text-bad" : "text-slate-300"}`}>
+                {teamStat.goal_diff > 0 ? "+" : ""}{teamStat.goal_diff}
+              </p>
+            </div>
+            <div className="text-center flex-1">
+              <p className="stat-label">W-D-L</p>
+              <p className="font-mono text-xl sm:text-2xl font-bold text-white mt-1">
+                <span className="text-good">{teamStat.won}</span>
+                <span className="text-slate-600">-</span>
+                <span>{teamStat.drawn}</span>
+                <span className="text-slate-600">-</span>
+                <span className="text-bad">{teamStat.lost}</span>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (

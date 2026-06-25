@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CircleAlert, Inbox } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function PageHeader({
@@ -11,12 +12,12 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between gap-4 mb-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 mb-8">
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
       </div>
-      {children}
+      {children && <div className="shrink-0">{children}</div>}
     </div>
   );
 }
@@ -62,8 +63,10 @@ export function Spinner() {
 
 export function ErrorState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <p className="text-sm text-bad">{message}</p>
+    <div className="flex flex-col items-center justify-center py-20 text-center" role="alert">
+      <CircleAlert size={28} className="text-bad/60 mb-3" />
+      <p className="text-sm font-medium text-bad">{message}</p>
+      <p className="text-xs text-slate-500 mt-1">Try refreshing the page</p>
     </div>
   );
 }
@@ -136,6 +139,7 @@ export function LeagueSelector({
       <select
         value={selected ?? "__all__"}
         onChange={(e) => onChange(e.target.value === "__all__" ? null : e.target.value)}
+        aria-label="Select league"
         className="input pl-4 pr-8 py-2.5 min-w-[200px] appearance-none text-sm font-medium"
       >
         <option value="__all__">All Leagues</option>
@@ -157,15 +161,18 @@ export function LeagueSelector({
 }
 
 export function LeagueStatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { cls: string }> = {
-    "LIVE READY": { cls: "bg-good/10 text-good border-good/30" },
-    "BLOCKED": { cls: "bg-slate-700/50 text-slate-400 border-slate-600" },
-    "THIN": { cls: "bg-warn/10 text-warn border-warn/30" },
-    "MISSING DATA": { cls: "bg-bad/10 text-bad border-bad/30" },
+  const cfg: Record<string, { cls: string; tip: string }> = {
+    "LIVE READY": { cls: "bg-good/10 text-good border-good/30", tip: "Live odds connected, predictions active" },
+    "BLOCKED": { cls: "bg-slate-700/50 text-slate-400 border-slate-600", tip: "Missing data or odds feed -- predictions blocked" },
+    "THIN": { cls: "bg-warn/10 text-warn border-warn/30", tip: "Partial data coverage -- limited predictions" },
+    "MISSING DATA": { cls: "bg-bad/10 text-bad border-bad/30", tip: "Critical provider data missing" },
   };
   const c = cfg[status] ?? cfg["BLOCKED"];
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${c.cls}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${c.cls}`}
+      title={c.tip}
+    >
       {status}
     </span>
   );
@@ -174,6 +181,7 @@ export function LeagueStatusBadge({ status }: { status: string }) {
 export function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
+      <Inbox size={28} className="text-slate-600 mb-3" />
       <p className="text-sm text-slate-500">{message}</p>
     </div>
   );

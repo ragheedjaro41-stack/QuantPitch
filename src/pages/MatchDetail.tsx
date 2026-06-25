@@ -27,33 +27,33 @@ export default function MatchDetail() {
       <BackLink to="/matches" label="All Matches" />
 
       {/* Scoreboard */}
-      <div className="card p-8 mb-6">
-        <div className="text-center mb-6">
+      <div className="card p-5 sm:p-8 mb-6">
+        <div className="text-center mb-4 sm:mb-6">
           <span className="badge bg-base-700/60 text-slate-400">Round {match.round}</span>
           <p className="text-sm text-slate-400 mt-2">{formatDate(match.match_date)} · {formatTime(match.match_date)}</p>
         </div>
 
-        <div className="flex items-center justify-center gap-8">
-          <div className="flex flex-col items-center gap-3 flex-1 max-w-xs">
+        <div className="flex items-center justify-center gap-4 sm:gap-8">
+          <div className="flex flex-col items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <TeamBadge short_name={match.home_team?.short_name || "?"} color={match.home_team?.primary_color || "#666"} size="lg" logo_url={match.home_team?.logo_url} />
-            <p className="text-sm font-semibold text-white text-center">{match.home_team?.name}</p>
+            <p className="text-xs sm:text-sm font-semibold text-white text-center truncate max-w-full">{match.home_team?.name}</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="font-mono text-5xl font-bold text-white">{match.home_score}</span>
-            <span className="text-3xl text-slate-600">-</span>
-            <span className="font-mono text-5xl font-bold text-white">{match.away_score}</span>
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <span className="font-mono text-3xl sm:text-5xl font-bold text-white">{match.home_score}</span>
+            <span className="text-xl sm:text-3xl text-slate-600">-</span>
+            <span className="font-mono text-3xl sm:text-5xl font-bold text-white">{match.away_score}</span>
           </div>
 
-          <div className="flex flex-col items-center gap-3 flex-1 max-w-xs">
+          <div className="flex flex-col items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <TeamBadge short_name={match.away_team?.short_name || "?"} color={match.away_team?.primary_color || "#666"} size="lg" logo_url={match.away_team?.logo_url} />
-            <p className="text-sm font-semibold text-white text-center">{match.away_team?.name}</p>
+            <p className="text-xs sm:text-sm font-semibold text-white text-center truncate max-w-full">{match.away_team?.name}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-6 mt-6 text-sm text-slate-400">
+        <div className="flex items-center justify-center gap-4 sm:gap-6 mt-4 sm:mt-6 text-xs sm:text-sm text-slate-400">
           <span className="flex items-center gap-1.5"><MapPin size={14} /> {match.venue}</span>
-          <span className="flex items-center gap-1.5"><Clock size={14} /> Full Time</span>
+          <span className="flex items-center gap-1.5"><Clock size={14} /> {match.status === "completed" ? "Full Time" : "Scheduled"}</span>
         </div>
       </div>
 

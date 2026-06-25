@@ -72,7 +72,8 @@ export default function Matches() {
                   if (idx > 0) setSelectedRound(rounds[idx - 1]);
                 }}
                 disabled={!canPrev}
-                className="p-2 rounded-lg bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Previous matchday"
+                className="p-2.5 rounded-lg bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -80,6 +81,7 @@ export default function Matches() {
               <select
                 value={activeRound}
                 onChange={(e) => setSelectedRound(Number(e.target.value))}
+                aria-label="Select matchday"
                 className="input px-4 py-2.5 min-w-[140px] text-center font-semibold"
               >
                 {rounds.map((r) => (
@@ -93,7 +95,8 @@ export default function Matches() {
                   if (idx < rounds.length - 1) setSelectedRound(rounds[idx + 1]);
                 }}
                 disabled={!canNext}
-                className="p-2 rounded-lg bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Next matchday"
+                className="p-2.5 rounded-lg bg-base-700/50 text-slate-400 hover:text-white hover:bg-base-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={18} />
               </button>
@@ -137,6 +140,12 @@ export default function Matches() {
                       <span className="text-xs text-slate-600 mt-0.5">{formatTime(m.match_date)}</span>
                       {leagueBadge && (
                         <span className="text-[10px] text-slate-600 mt-1 font-semibold">{leagueBadge}</span>
+                      )}
+                    </div>
+                    <div className="flex sm:hidden flex-col items-center w-14 shrink-0">
+                      <span className="text-[10px] text-slate-500">{formatTime(m.match_date)}</span>
+                      {leagueBadge && (
+                        <span className="text-[10px] text-slate-600 font-semibold">{leagueBadge}</span>
                       )}
                     </div>
 

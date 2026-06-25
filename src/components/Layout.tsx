@@ -80,6 +80,7 @@ export default function Layout() {
         </div>
         <button
           onClick={() => setMobileOpen(false)}
+          aria-label="Close navigation menu"
           className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:bg-base-700 transition-colors"
         >
           <X size={20} />
@@ -130,10 +131,13 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-base-900">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+
       {/* Mobile header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-3 border-b border-base-700 bg-base-800/95 backdrop-blur-md lg:hidden">
+      <header className="fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-3 border-b border-base-700 bg-base-800/95 backdrop-blur-md lg:hidden">
         <button
           onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation menu"
           className="p-2 rounded-lg text-slate-400 hover:bg-base-700 transition-colors"
         >
           <Menu size={20} />
@@ -142,7 +146,7 @@ export default function Layout() {
           <span className="font-mono text-sm font-bold text-accent">Q</span>
         </div>
         <span className="text-sm font-bold text-white">QuantPitch</span>
-      </div>
+      </header>
 
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -153,7 +157,7 @@ export default function Layout() {
       )}
 
       {/* Sidebar - desktop */}
-      <aside className="hidden lg:flex fixed left-0 top-0 z-30 h-screen w-64 flex-col border-r border-base-700 bg-base-800/95 backdrop-blur-md">
+      <aside aria-label="Main navigation" className="hidden lg:flex fixed left-0 top-0 z-30 h-screen w-64 flex-col border-r border-base-700 bg-base-800/95 backdrop-blur-md">
         {sidebarContent}
       </aside>
 
@@ -167,7 +171,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 pt-14 lg:pt-0">
+      <main id="main-content" className="flex-1 lg:ml-64 pt-14 lg:pt-0">
         <Outlet />
       </main>
     </div>
