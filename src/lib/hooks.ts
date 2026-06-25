@@ -596,9 +596,10 @@ export function useTopPlays() {
         const finalPickStatus = cupGate.pick_status;
         const modelFlags = buildModelFlags({
           has_live_odds: playability.has_live_odds,
-          has_xg: false, // no xG feed connected
+          has_xg: false,
           has_stats: statsCov >= 50,
           has_settlement: statsCov >= 30,
+          has_trusted_market: playability.has_live_odds,
           cup_historical_sample: cupSample,
         });
 

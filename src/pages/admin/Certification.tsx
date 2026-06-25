@@ -104,6 +104,7 @@ export default function Certification() {
       has_xg: false,
       has_stats: (cov?.stats_coverage ?? 0) >= 50,
       has_settlement: (cov?.standings_coverage ?? 0) >= 30,
+      has_trusted_market: l.has_live_odds ?? false,
     });
     return {
       category: "League",

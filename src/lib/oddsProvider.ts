@@ -178,6 +178,16 @@ export type SyncOddsResult = {
   live_odds_changed: boolean;
   provider_status: string;
   detail?: string;
+  cooldown_remaining?: number;
+  leagues_changed?: string[];
+  markets_seen?: string[];
+  untrusted_markets_skipped?: string[];
+  odds_age?: {
+    freshest_hours: number | null;
+    oldest_hours: number | null;
+    avg_hours: number | null;
+    total_fresh: number;
+  };
 };
 
 export async function invokeSyncOdds(sport?: string): Promise<SyncOddsResult> {

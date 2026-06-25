@@ -396,3 +396,72 @@ describe("Provider activation safety", () => {
     }
   });
 });
+
+// ============================================================
+// 9. TRUSTED MARKET + SETTLEMENT CERTIFICATION RULE
+// ============================================================
+describe("Trusted market and settlement certification", () => {
+  it("trusted_market_backed defaults to false when not specified", () => {
+    const flags = buildModelFlags({ has_live_odds: true, has_xg: false, has_stats: true, has_settlement: true });
+    expect(flags.trusted_market_backed).toBe(false);
+  });
+
+  it("trusted_market_backed is true when explicitly set", () => {
+    const flags = buildModelFlags({ has_live_odds: true, has_xg: false, has_stats: true, has_settlement: true, has_trusted_market: true });
+    expect(flags.trusted_market_backed).toBe(true);
+  });
+
+  it("LIVE_PICK model flags include trusted_market_backed=true when live odds + trusted market", () => {
+    const flags = buildModelFlags({
+      has_live_odds: true,
+      has_xg: false,
+      has_stats: true,
+      has_settlement: true,
+      has_trusted_market: true,
+    });
+    expect(flags.odds_backed).toBe(true);
+    expect(flags.trusted_market_backed).toBe(true);
+    expect(flags.settlement_backed).toBe(true);
+    expect(flags.model_tier).toBe("odds_form");
+  });
+
+  it("no live odds means no trusted market backed (impossible to have trusted market without odds)", () => {
+    const flags = buildModelFlags({
+      has_live_odds: false,
+      has_xg: false,
+      has_stats: true,
+      has_settlement: true,
+      has_trusted_market: false,
+    });
+    expect(flags.odds_backed).toBe(false);
+    expect(flags.trusted_market_backed).toBe(false);
+    expect(flags.model_tier).toBe("form_only");
+  });
+
+  it("full certification chain: synthetic=DEMO, no_odds=BLOCKED, live+trusted+settlement=LIVE", async () => {
+    const synthetic = makeLeague({ is_synthetic: true });
+    const r1 = await computeLeaguePlayability(synthetic, [], undefined);
+    expect(r1.pick_status).toBe("DEMO_PICK");
+
+    const noOdds = makeLeague({ has_live_odds: false });
+    const r2 = await computeLeaguePlayability(noOdds, [], undefined);
+    expect(r2.pick_status).toBe("BLOCKED_PICK");
+
+    const liveReady = makeLeague({ has_live_odds: true, playable: true, is_synthetic: false });
+    const r3 = await computeLeaguePlayability(liveReady, [], undefined);
+    expect(r3.pick_status).toBe("LIVE_PICK");
+    expect(r3.model_flags.odds_backed).toBe(true);
+    expect(r3.model_flags.settlement_backed).toBe(true);
+  });
+
+  it("settlement_backed false when coverage too low", async () => {
+    const league = makeLeague({ has_live_odds: true, fixture_coverage: 10 });
+    const flags = buildModelFlags({
+      has_live_odds: true,
+      has_xg: false,
+      has_stats: true,
+      has_settlement: false,
+    });
+    expect(flags.settlement_backed).toBe(false);
+  });
+});

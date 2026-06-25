@@ -12,6 +12,7 @@ export type ModelFeatureFlags = {
   xg_backed: boolean;         // Expected goals data available from provider
   stats_backed: boolean;      // Player/match stats available (shots, passes, etc.)
   settlement_backed: boolean; // Historical settlement data available
+  trusted_market_backed: boolean; // Odds come from a trusted, normalized market
 
   // Cup-specific
   cup_historical_backed: boolean; // Historical cup data meets minimum sample requirement
@@ -33,6 +34,7 @@ export function buildModelFlags(signals: {
   has_xg: boolean;
   has_stats: boolean;
   has_settlement: boolean;
+  has_trusted_market?: boolean;
   cup_historical_sample?: number | null;
 }): ModelFeatureFlags {
   const form_backed = true; // always available when match history exists
@@ -40,6 +42,7 @@ export function buildModelFlags(signals: {
   const xg_backed = signals.has_xg;
   const stats_backed = signals.has_stats;
   const settlement_backed = signals.has_settlement;
+  const trusted_market_backed = signals.has_trusted_market ?? false;
 
   const sample = signals.cup_historical_sample ?? 0;
   const cup_historical_backed = sample >= MIN_CUP_FIXTURES;
@@ -69,6 +72,7 @@ export function buildModelFlags(signals: {
     xg_backed,
     stats_backed,
     settlement_backed,
+    trusted_market_backed,
     cup_historical_backed,
     et_probability_backed,
     penalty_probability_backed,

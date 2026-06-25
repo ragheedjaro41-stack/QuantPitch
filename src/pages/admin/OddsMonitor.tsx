@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useOddsProviders, useOddsMonitor, useCoverageRefreshLog } from "../../lib/adminHooks";
+import { useOddsProviders, useOddsMonitor, useCoverageRefreshLog, useOddsSyncLog, useSyncCooldown, useTrustedMarkets } from "../../lib/adminHooks";
 import { PageHeader, Spinner } from "../../components/ui";
 import { ODDS_STALE_THRESHOLD_HOURS, invokeSyncOdds } from "../../lib/oddsProvider";
 import type { SyncOddsResult } from "../../lib/oddsProvider";
-import { Radio, CircleX as XCircle, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Clock, Database, ChartBar as BarChart2, Wifi, WifiOff, RefreshCw, ShieldAlert, Play } from "lucide-react";
+import { Radio, CircleX as XCircle, CircleCheck as CheckCircle, Clock, Database, ChartBar as BarChart2, Wifi, WifiOff, RefreshCw, ShieldAlert, Play, Timer, List } from "lucide-react";
 
 function timeSince(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -19,6 +19,9 @@ export default function OddsMonitor() {
   const { data: providers, isLoading: pLoading, refetch: refetchProviders } = useOddsProviders();
   const { data: monitor, isLoading: mLoading, refetch: refetchMonitor } = useOddsMonitor();
   const { data: refreshLog } = useCoverageRefreshLog(5);
+  const { data: syncLog, refetch: refetchSyncLog } = useOddsSyncLog(10);
+  const { data: cooldown } = useSyncCooldown();
+  const { data: trustedMarkets } = useTrustedMarkets();
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncOddsResult | null>(null);
@@ -29,8 +32,7 @@ export default function OddsMonitor() {
     try {
       const result = await invokeSyncOdds();
       setSyncResult(result);
-      await refetchProviders();
-      await refetchMonitor();
+      await Promise.all([refetchProviders(), refetchMonitor(), refetchSyncLog()]);
     } catch (err: unknown) {
       setSyncResult({
         error: err instanceof Error ? err.message : String(err),
@@ -56,8 +58,9 @@ export default function OddsMonitor() {
   const withNoOdds = leagues.filter((l) => l.total_odds_count === 0 && !l.is_synthetic);
   const syntheticLeagues = leagues.filter((l) => l.is_synthetic);
   const liveReadyLeagues = leagues.filter((l) => l.has_live_odds && l.playable && !l.is_synthetic);
-
   const lastRefresh = refreshLog?.[0];
+  const onCooldown = cooldown?.onCooldown ?? false;
+  const cooldownRemaining = cooldown?.remaining ?? 0;
 
   return (
     <div className="px-8 py-8 max-w-7xl mx-auto">
@@ -103,22 +106,30 @@ export default function OddsMonitor() {
         </div>
       </div>
 
-      {/* Manual sync */}
+      {/* Manual sync with cooldown */}
       <div className="card p-5 mb-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <h3 className="text-sm font-bold text-white">Manual Odds Sync</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Invokes the sync-odds edge function. If ODDS_API_KEY is not configured, it will fail safely without changing any data.
+              Invokes the sync-odds edge function. 120s cooldown between syncs to protect API quota.
             </p>
+            {onCooldown && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <Timer size={12} className="text-warn" />
+                <span className="text-xs font-semibold text-warn">
+                  Cooldown: {cooldownRemaining}s remaining
+                </span>
+              </div>
+            )}
           </div>
           <button
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || onCooldown}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {syncing ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
-            {syncing ? "Syncing..." : "Run Odds Sync"}
+            {syncing ? "Syncing..." : onCooldown ? `Wait ${cooldownRemaining}s` : "Run Odds Sync"}
           </button>
         </div>
         {syncResult && (
@@ -129,18 +140,31 @@ export default function OddsMonitor() {
               ) : (
                 <CheckCircle size={14} className="text-good shrink-0 mt-0.5" />
               )}
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className={`text-xs font-semibold ${syncResult.error ? "text-bad" : "text-good"}`}>
                   {syncResult.error ? "Sync failed" : "Sync completed"}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {syncResult.error || syncResult.message}
                 </p>
-                <div className="flex gap-4 mt-2">
+                <div className="flex flex-wrap gap-4 mt-2">
                   <span className="text-xs text-slate-500">Synced: <span className="font-mono font-bold text-white">{syncResult.synced}</span></span>
                   <span className="text-xs text-slate-500">Provider: <span className="font-mono font-bold text-white">{syncResult.provider_status}</span></span>
                   <span className="text-xs text-slate-500">Live odds changed: <span className={`font-mono font-bold ${syncResult.live_odds_changed ? "text-good" : "text-slate-400"}`}>{syncResult.live_odds_changed ? "YES" : "NO"}</span></span>
                 </div>
+                {syncResult.untrusted_markets_skipped && syncResult.untrusted_markets_skipped.length > 0 && (
+                  <div className="mt-2 p-2 rounded bg-warn/5 border border-warn/20">
+                    <p className="text-xs text-warn font-semibold">Untrusted markets skipped:</p>
+                    <p className="text-xs text-slate-400 mt-0.5 font-mono">{syncResult.untrusted_markets_skipped.join(", ")}</p>
+                  </div>
+                )}
+                {syncResult.odds_age && (
+                  <div className="flex gap-4 mt-2">
+                    <span className="text-xs text-slate-500">Freshest: <span className="font-mono text-white">{syncResult.odds_age.freshest_hours ?? "--"}h</span></span>
+                    <span className="text-xs text-slate-500">Avg: <span className="font-mono text-white">{syncResult.odds_age.avg_hours ?? "--"}h</span></span>
+                    <span className="text-xs text-slate-500">Total fresh: <span className="font-mono text-white">{syncResult.odds_age.total_fresh}</span></span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -167,10 +191,6 @@ export default function OddsMonitor() {
                   <span className="text-xs font-bold" style={{ color: statusColor }}>{p.status.toUpperCase()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500">API Endpoint</span>
-                  <span className="text-xs text-slate-400 truncate max-w-[120px]">{p.api_endpoint || "Not set"}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-xs text-slate-500">Last Success</span>
                   <span className="text-xs text-slate-400">{p.last_success_at ? timeSince(p.last_success_at) : "Never"}</span>
                 </div>
@@ -184,7 +204,7 @@ export default function OddsMonitor() {
         })}
       </div>
 
-      {/* Sync summary */}
+      {/* Sync summary stats */}
       <h2 className="text-sm font-bold text-white mb-3">Odds Sync Summary</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
         <div className="card p-3 text-center">
@@ -219,6 +239,111 @@ export default function OddsMonitor() {
         </div>
       </div>
 
+      {/* Trusted markets audit */}
+      <h2 className="text-sm font-bold text-white mb-3">Market Normalization Audit</h2>
+      <div className="card overflow-hidden mb-6">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-base-700/60 bg-base-700/20">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Market Key</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Display Name</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Category</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Trusted</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Settlement</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(trustedMarkets || []).map((m) => (
+              <tr key={m.id} className="border-b border-base-700/30 last:border-0">
+                <td className="px-4 py-2.5">
+                  <code className="text-xs text-accent bg-base-700/60 px-1.5 py-0.5 rounded">{m.market_key}</code>
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="text-sm text-white">{m.display_name}</span>
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="text-xs text-slate-400">{m.category}</span>
+                </td>
+                <td className="px-4 py-2.5">
+                  {m.trusted ? <CheckCircle size={14} className="text-good" /> : <XCircle size={14} className="text-bad" />}
+                </td>
+                <td className="px-4 py-2.5">
+                  {m.settlement_supported ? <CheckCircle size={14} className="text-good" /> : <XCircle size={14} className="text-warn" />}
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="text-xs text-slate-500">{m.notes || "--"}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Sync log */}
+      <h2 className="text-sm font-bold text-white mb-3">Sync History</h2>
+      <div className="card overflow-hidden mb-6">
+        {!syncLog || syncLog.length === 0 ? (
+          <div className="p-6 text-center">
+            <List size={20} className="text-slate-600 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No sync runs recorded yet</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-base-700/60 bg-base-700/20">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-40">Started</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Synced</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Events</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Markets</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Untrusted</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Error / Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {syncLog.map((entry) => {
+                const statusColor =
+                  entry.status === "completed" ? "#10B981" :
+                  entry.status === "failed" ? "#f87171" :
+                  entry.status === "running" ? "#00D4FF" : "#fbbf24";
+                return (
+                  <tr key={entry.id} className="border-b border-base-700/30 last:border-0">
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs text-slate-400">{new Date(entry.started_at).toLocaleString()}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs font-bold" style={{ color: statusColor }}>{entry.status.toUpperCase()}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs font-mono text-white">{entry.synced_count}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs font-mono text-white">{entry.events_count}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs text-slate-400 font-mono">{entry.markets_seen.join(", ") || "--"}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {entry.untrusted_markets_seen.length > 0 ? (
+                        <span className="text-xs text-warn font-mono">{entry.untrusted_markets_seen.join(", ")}</span>
+                      ) : (
+                        <span className="text-xs text-slate-600">--</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs text-slate-500 truncate max-w-[200px] block">
+                        {entry.error_message || (entry.odds_age_summary ? `Fresh: ${entry.odds_age_summary.total_fresh}` : "--")}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Last coverage refresh */}
       {lastRefresh && (
         <div className="card p-4 mb-6 flex items-center gap-3">
@@ -242,10 +367,7 @@ export default function OddsMonitor() {
             <div>
               <p className="text-sm font-bold text-bad">Zero odds rows in database</p>
               <p className="text-xs text-slate-400 mt-1">
-                No odds have ever been ingested. To populate odds: configure an API endpoint on a provider,
-                deploy an edge function that calls <code className="text-xs bg-base-700/60 px-1 rounded">ingestMatchOdds()</code>,
-                then call <code className="text-xs bg-base-700/60 px-1 rounded">syncLeagueLiveOddsFlags()</code> to
-                update <code className="text-xs bg-base-700/60 px-1 rounded">has_live_odds</code> on each league.
+                No odds have ever been ingested. Configure ODDS_API_KEY in Edge Function secrets, then use the sync button above.
               </p>
             </div>
           </div>
@@ -254,8 +376,6 @@ export default function OddsMonitor() {
 
       {/* League odds matrix */}
       <h2 className="text-sm font-bold text-white mb-3">League Odds Status</h2>
-
-      {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <div className="card p-3 text-center">
           <p className="font-mono text-lg font-bold text-good">{withFreshOdds.length}</p>
@@ -300,71 +420,31 @@ export default function OddsMonitor() {
             {leagues.map((l) => {
               let verdict: string;
               let verdictColor: string;
-              if (l.is_synthetic) {
-                verdict = "DEMO ONLY";
-                verdictColor = "#fbbf24";
-              } else if (l.has_live_odds && l.playable) {
-                verdict = "LIVE READY";
-                verdictColor = "#10B981";
-              } else if (l.fresh_odds_count > 0 && !l.has_live_odds) {
-                verdict = "SYNC NEEDED";
-                verdictColor = "#00D4FF";
-              } else if (l.stale_odds_count > 0 && l.fresh_odds_count === 0) {
-                verdict = "STALE";
-                verdictColor = "#fbbf24";
-              } else if (!l.playable) {
-                verdict = "BLOCKED";
-                verdictColor = "#64748b";
-              } else {
-                verdict = "MISSING ODDS";
-                verdictColor = "#f87171";
-              }
+              if (l.is_synthetic) { verdict = "DEMO ONLY"; verdictColor = "#fbbf24"; }
+              else if (l.has_live_odds && l.playable) { verdict = "LIVE READY"; verdictColor = "#10B981"; }
+              else if (l.fresh_odds_count > 0 && !l.has_live_odds) { verdict = "SYNC NEEDED"; verdictColor = "#00D4FF"; }
+              else if (l.stale_odds_count > 0 && l.fresh_odds_count === 0) { verdict = "STALE"; verdictColor = "#fbbf24"; }
+              else if (!l.playable) { verdict = "BLOCKED"; verdictColor = "#64748b"; }
+              else { verdict = "MISSING ODDS"; verdictColor = "#f87171"; }
 
               return (
                 <tr key={l.id} className="border-b border-base-700/30 last:border-0 hover:bg-base-700/10 transition-colors">
+                  <td className="px-4 py-2.5"><span className="text-sm text-white">{l.name}</span></td>
+                  <td className="px-4 py-2.5"><span className="text-xs text-slate-500 font-mono">T{l.tier}</span></td>
                   <td className="px-4 py-2.5">
-                    <span className="text-sm text-white">{l.name}</span>
+                    {l.has_live_odds ? <CheckCircle size={14} className="text-good" /> : <XCircle size={14} className="text-bad" />}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="text-xs text-slate-500 font-mono">T{l.tier}</span>
+                    <span className={`text-xs font-mono font-bold ${l.fresh_odds_count > 0 ? "text-good" : "text-slate-600"}`}>{l.fresh_odds_count}</span>
                   </td>
                   <td className="px-4 py-2.5">
-                    {l.has_live_odds ? (
-                      <CheckCircle size={14} className="text-good" />
-                    ) : (
-                      <XCircle size={14} className="text-bad" />
-                    )}
+                    <span className={`text-xs font-mono font-bold ${l.stale_odds_count > 0 ? "text-warn" : "text-slate-600"}`}>{l.stale_odds_count}</span>
                   </td>
+                  <td className="px-4 py-2.5"><span className="text-xs text-slate-400">{l.freshest_at ? timeSince(l.freshest_at) : "--"}</span></td>
+                  <td className="px-4 py-2.5"><span className="text-xs text-slate-400">{l.bookmakers.length > 0 ? l.bookmakers.join(", ") : "--"}</span></td>
+                  <td className="px-4 py-2.5"><span className="text-xs text-slate-400">{l.markets.length > 0 ? l.markets.join(", ") : "--"}</span></td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-xs font-mono font-bold ${l.fresh_odds_count > 0 ? "text-good" : "text-slate-600"}`}>
-                      {l.fresh_odds_count}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className={`text-xs font-mono font-bold ${l.stale_odds_count > 0 ? "text-warn" : "text-slate-600"}`}>
-                      {l.stale_odds_count}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs text-slate-400">
-                      {l.freshest_at ? timeSince(l.freshest_at) : "--"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs text-slate-400">
-                      {l.bookmakers.length > 0 ? l.bookmakers.join(", ") : "--"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs text-slate-400">
-                      {l.markets.length > 0 ? l.markets.join(", ") : "--"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs font-bold"
-                      style={{ color: verdictColor, borderColor: `${verdictColor}33`, backgroundColor: `${verdictColor}10` }}
-                    >
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs font-bold" style={{ color: verdictColor, borderColor: `${verdictColor}33`, backgroundColor: `${verdictColor}10` }}>
                       {verdict}
                     </span>
                   </td>
@@ -375,7 +455,7 @@ export default function OddsMonitor() {
         </table>
       </div>
 
-      {/* Blocked leagues detail */}
+      {/* Blocked leagues */}
       <h2 className="text-sm font-bold text-white mt-8 mb-3">Why Each League Is Blocked</h2>
       <div className="card overflow-hidden">
         <table className="w-full">
@@ -397,15 +477,9 @@ export default function OddsMonitor() {
                 if (l.total_odds_count === 0 && !l.is_synthetic) reasons.push("Zero odds rows in match_odds table");
                 return (
                   <tr key={l.id} className="border-b border-base-700/30 last:border-0">
-                    <td className="px-4 py-2.5">
-                      <span className="text-sm text-white">{l.name}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-xs text-slate-500 font-mono">T{l.tier}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-xs text-slate-400">{reasons.join(" | ")}</span>
-                    </td>
+                    <td className="px-4 py-2.5"><span className="text-sm text-white">{l.name}</span></td>
+                    <td className="px-4 py-2.5"><span className="text-xs text-slate-500 font-mono">T{l.tier}</span></td>
+                    <td className="px-4 py-2.5"><span className="text-xs text-slate-400">{reasons.join(" | ")}</span></td>
                   </tr>
                 );
               })}

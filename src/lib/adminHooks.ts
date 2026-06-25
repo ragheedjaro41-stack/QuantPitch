@@ -519,3 +519,90 @@ export function useOddsMonitor() {
     },
   });
 }
+
+// ============================================================
+// ODDS SYNC LOG
+// ============================================================
+export type OddsSyncLogEntry = {
+  id: string;
+  provider_slug: string;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  synced_count: number;
+  events_count: number;
+  error_message: string | null;
+  leagues_changed: string[];
+  odds_age_summary: {
+    freshest_hours: number | null;
+    oldest_hours: number | null;
+    avg_hours: number | null;
+    total_fresh: number;
+  } | null;
+  markets_seen: string[];
+  untrusted_markets_seen: string[];
+  sport_key: string | null;
+};
+
+export function useOddsSyncLog(limit = 10) {
+  return useQuery({
+    queryKey: ["odds-sync-log", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("odds_sync_log")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as OddsSyncLogEntry[];
+    },
+  });
+}
+
+export function useSyncCooldown() {
+  return useQuery({
+    queryKey: ["sync-cooldown"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("odds_sync_log")
+        .select("started_at")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return { onCooldown: false, remaining: 0 };
+      const elapsed = (Date.now() - new Date(data.started_at).getTime()) / 1000;
+      const remaining = Math.max(0, Math.ceil(120 - elapsed));
+      return { onCooldown: remaining > 0, remaining };
+    },
+  });
+}
+
+// ============================================================
+// TRUSTED MARKETS
+// ============================================================
+export type TrustedMarket = {
+  id: string;
+  market_key: string;
+  display_name: string;
+  category: string;
+  trusted: boolean;
+  settlement_supported: boolean;
+  notes: string | null;
+};
+
+export function useTrustedMarkets() {
+  return useQuery({
+    queryKey: ["trusted-markets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trusted_markets")
+        .select("*")
+        .order("category")
+        .order("market_key");
+      if (error) throw error;
+      return data as TrustedMarket[];
+    },
+  });
+}
