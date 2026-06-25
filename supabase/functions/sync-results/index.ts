@@ -9,34 +9,48 @@ const corsHeaders = {
 };
 
 const COOLDOWN_SECONDS = 120;
+const PROVIDER_SOURCE = "api-football";
 
-// Status values from the football-data.org API (and similar providers)
-const FINISHED_STATUSES = ["FINISHED", "FT", "AET", "PEN"];
+// API-Football status values
+const FINISHED_STATUSES = ["FT", "AET", "PEN"];
 const VOID_STATUSES_API = [
-  "POSTPONED",
-  "CANCELLED",
-  "ABANDONED",
-  "SUSPENDED",
-  "AWARDED",
+  "PST",  // Postponed
+  "CANC", // Cancelled
+  "ABD",  // Abandoned
+  "SUSP", // Suspended
+  "AWD",  // Awarded (technical)
 ];
 
 type ApiFixture = {
-  id: number;
-  status: string;
-  utcDate: string;
-  homeTeam: { name: string; id: number };
-  awayTeam: { name: string; id: number };
-  score: {
-    fullTime: { home: number | null; away: number | null };
-    halfTime: { home: number | null; away: number | null };
-    extraTime?: { home: number | null; away: number | null };
-    penalties?: { home: number | null; away: number | null };
-    winner?: string | null;
-    duration?: string;
+  fixture: {
+    id: number;
+    date: string;
+    status: {
+      long: string;
+      short: string;
+      elapsed: number | null;
+    };
+    venue?: { name: string | null };
   };
-  competition?: { name: string; type?: string };
-  matchday?: number;
-  stage?: string;
+  league: {
+    id: number;
+    name: string;
+    round: string;
+  };
+  teams: {
+    home: { id: number; name: string };
+    away: { id: number; name: string };
+  };
+  goals: {
+    home: number | null;
+    away: number | null;
+  };
+  score: {
+    halftime: { home: number | null; away: number | null };
+    fulltime: { home: number | null; away: number | null };
+    extratime: { home: number | null; away: number | null };
+    penalty: { home: number | null; away: number | null };
+  };
 };
 
 function jsonResponse(
@@ -91,7 +105,7 @@ Deno.serve(async (req: Request) => {
     // ── 2. Create sync log entry ──
     const { data: logEntry, error: logErr } = await supabase
       .from("results_sync_log")
-      .insert({ provider: "api-football", status: "running" })
+      .insert({ provider: PROVIDER_SOURCE, status: "running" })
       .select("id")
       .single();
 
@@ -117,7 +131,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", logId);
     };
 
-    // ── 3. Check for results provider API key (env secret first, then DB fallback) ──
+    // ── 3. Check for API-Football key (env secret first, then DB fallback) ──
     let resultsApiKey = Deno.env.get("API_FOOTBALL_KEY");
     if (!resultsApiKey) {
       const { data: cfgRow } = await supabase
@@ -138,28 +152,28 @@ Deno.serve(async (req: Request) => {
 
       return jsonResponse({
         error:
-          "API_FOOTBALL_KEY secret not configured. Add it via Supabase dashboard > Edge Functions > Secrets. No results were fetched and no fake results were created.",
+          "API_FOOTBALL_KEY secret not configured. Add it via Supabase dashboard > Edge Functions > Secrets.",
         synced: 0,
         settled: 0,
         provider_status: "missing_key",
       });
     }
 
-    // ── 4. Fetch completed fixtures from API ──
-    // Parse optional body for competition filter
-    let body: { competition?: string } = {};
+    // ── 4. Fetch completed fixtures from API-Football ──
+    let body: { league?: number; season?: number } = {};
     try {
       body = await req.json();
     } catch {
       // no body is fine
     }
-    const competitionId = body.competition || "PL"; // default: Premier League
+    const leagueId = body.league || 39; // default: Premier League
+    const season = body.season || new Date().getFullYear();
 
-    const apiUrl = `https://api.football-data.org/v4/competitions/${competitionId}/matches?status=FINISHED,POSTPONED,CANCELLED,SUSPENDED`;
+    const apiUrl = `https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${season}&status=FT-AET-PEN-PST-CANC-ABD-SUSP-AWD`;
     let fixtures: ApiFixture[];
     try {
       const apiRes = await fetch(apiUrl, {
-        headers: { "X-Auth-Token": resultsApiKey },
+        headers: { "x-apisports-key": resultsApiKey },
       });
       if (!apiRes.ok) {
         const errText = await apiRes.text();
@@ -169,7 +183,7 @@ Deno.serve(async (req: Request) => {
           settled_count: 0,
         });
         return jsonResponse({
-          error: `Results API returned ${apiRes.status}`,
+          error: `API-Football returned ${apiRes.status}`,
           detail: errText.slice(0, 300),
           synced: 0,
           settled: 0,
@@ -177,7 +191,7 @@ Deno.serve(async (req: Request) => {
         });
       }
       const json = await apiRes.json();
-      fixtures = json.matches || [];
+      fixtures = json.response || [];
     } catch (fetchErr: unknown) {
       const message =
         fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
@@ -187,7 +201,7 @@ Deno.serve(async (req: Request) => {
         settled_count: 0,
       });
       return jsonResponse({
-        error: `Failed to fetch from Results API: ${message}`,
+        error: `Failed to fetch from API-Football: ${message}`,
         synced: 0,
         settled: 0,
         provider_status: "error",
@@ -242,8 +256,9 @@ Deno.serve(async (req: Request) => {
     ];
 
     for (const fixture of fixtures) {
+      const fixtureStatus = fixture.fixture.status.short;
+
       // Try to match fixture to a database match by team names
-      // This is a best-effort match; production would use external IDs
       let matchId: string | null = null;
       for (const m of dbMatches || []) {
         const dbHome = teamNameById.get(
@@ -253,8 +268,8 @@ Deno.serve(async (req: Request) => {
           (m as { away_team_id: string }).away_team_id
         );
         if (!dbHome || !dbAway) continue;
-        const apiHome = fixture.homeTeam?.name || "";
-        const apiAway = fixture.awayTeam?.name || "";
+        const apiHome = fixture.teams.home?.name || "";
+        const apiAway = fixture.teams.away?.name || "";
         if (
           (dbHome.toLowerCase().includes(apiHome.toLowerCase()) ||
             apiHome.toLowerCase().includes(dbHome.toLowerCase())) &&
@@ -266,72 +281,73 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (!matchId) continue; // no matching DB match found
-      if (alreadySettled.has(matchId)) continue; // already settled
+      if (!matchId) continue;
+      if (alreadySettled.has(matchId)) continue;
+
+      const isFinished = FINISHED_STATUSES.includes(fixtureStatus);
+      const isVoid = VOID_STATUSES_API.includes(fixtureStatus);
+
+      if (!isFinished && !isVoid) continue;
 
       const score = fixture.score;
-      const isFinished = FINISHED_STATUSES.includes(fixture.status);
-      const isVoid = VOID_STATUSES_API.includes(fixture.status);
-
-      // SAFETY: if fixture is not finished and not void, skip entirely
-      if (!isFinished && !isVoid) continue;
 
       // SAFETY: finished fixture MUST have a final score
       if (isFinished) {
-        if (score.fullTime.home == null || score.fullTime.away == null) {
+        if (score.fulltime.home == null || score.fulltime.away == null) {
           missingScoreCount++;
           errors.push(
-            `Fixture ${fixture.id}: status=${fixture.status} but fullTime score is null. Skipped.`
+            `Fixture ${fixture.fixture.id}: status=${fixtureStatus} but fulltime score is null. Skipped.`
           );
           continue;
         }
       }
 
-      // Determine competition type
-      const compType =
-        fixture.competition?.type === "CUP" ||
-        fixture.stage === "FINAL" ||
-        fixture.stage === "SEMI_FINALS" ||
-        fixture.stage === "QUARTER_FINALS"
-          ? "cup"
-          : "league";
+      // Determine competition type from league round
+      const round = fixture.league.round?.toLowerCase() || "";
+      const isCup =
+        round.includes("final") ||
+        round.includes("semi") ||
+        round.includes("quarter") ||
+        round.includes("round of") ||
+        round.includes("knockout");
+      const compType = isCup ? "cup" : "league";
 
       // Determine if ET/penalties happened
       const wentToET =
-        score.extraTime?.home != null && score.extraTime?.away != null;
+        score.extratime?.home != null && score.extratime?.away != null;
       const wentToPen =
-        score.penalties?.home != null && score.penalties?.away != null;
+        score.penalty?.home != null && score.penalty?.away != null;
 
       // Build match_status
       let matchStatus: string;
       if (isFinished) {
         matchStatus = "confirmed";
-      } else if (fixture.status === "POSTPONED") {
+      } else if (fixtureStatus === "PST") {
         matchStatus = "postponed";
-      } else if (fixture.status === "CANCELLED") {
+      } else if (fixtureStatus === "CANC") {
         matchStatus = "cancelled";
-      } else if (fixture.status === "ABANDONED") {
+      } else if (fixtureStatus === "ABD") {
         matchStatus = "abandoned";
       } else {
         matchStatus = "pending_review";
       }
 
-      // Build result row
+      // Build result row — FT score uses score.fulltime (regulation only)
       const resultRow: Record<string, unknown> = {
         match_id: matchId,
-        ft_home: isFinished ? score.fullTime.home : 0,
-        ft_away: isFinished ? score.fullTime.away : 0,
-        ht_home: score.halfTime?.home ?? null,
-        ht_away: score.halfTime?.away ?? null,
-        et_home: score.extraTime?.home ?? null,
-        et_away: score.extraTime?.away ?? null,
-        pen_home: score.penalties?.home ?? null,
-        pen_away: score.penalties?.away ?? null,
+        ft_home: isFinished ? score.fulltime.home : 0,
+        ft_away: isFinished ? score.fulltime.away : 0,
+        ht_home: score.halftime?.home ?? null,
+        ht_away: score.halftime?.away ?? null,
+        et_home: score.extratime?.home ?? null,
+        et_away: score.extratime?.away ?? null,
+        pen_home: score.penalty?.home ?? null,
+        pen_away: score.penalty?.away ?? null,
         went_to_et: wentToET,
         went_to_penalties: wentToPen,
         match_status: matchStatus,
         competition_type: compType,
-        provider_source: "api-football",
+        provider_source: PROVIDER_SOURCE,
       };
 
       // Insert match result
@@ -380,7 +396,6 @@ Deno.serve(async (req: Request) => {
               ? `Both scored (FT ${ftHome}-${ftAway})`
               : `Not both scored (FT ${ftHome}-${ftAway})`;
           } else {
-            // totals_X.X
             const line = parseFloat(market.replace("totals_", ""));
             if (totalGoals > line) {
               outcome = "over";
@@ -398,11 +413,11 @@ Deno.serve(async (req: Request) => {
             outcome,
             status: "settled",
             reason,
+            provider_source: PROVIDER_SOURCE,
           });
         }
         settledCount++;
       } else {
-        // Void/pending_review: void all markets
         const resultId = resultData.id as string;
         for (const market of SUPPORTED_MARKETS) {
           await supabase.from("settlement_log").insert({
@@ -412,6 +427,7 @@ Deno.serve(async (req: Request) => {
             outcome: "void",
             status: matchStatus === "pending_review" ? "pending_review" : "void",
             reason: `Match ${matchStatus} — all markets voided`,
+            provider_source: PROVIDER_SOURCE,
           });
         }
         voidCount++;

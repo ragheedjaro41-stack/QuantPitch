@@ -642,6 +642,7 @@ export type SettlementLogRow = {
   status: string;
   reason: string;
   settled_at: string;
+  provider_source: string | null;
 };
 
 export function useMatchResults(limit = 50) {
@@ -706,12 +707,12 @@ export function useSettlementSummary() {
     queryKey: ["settlement-summary"],
     queryFn: async () => {
       const [resultsR, logsR] = await Promise.all([
-        supabase.from("match_results").select("id, match_status"),
-        supabase.from("settlement_log").select("id, market_key, status"),
+        supabase.from("match_results").select("id, match_status, provider_source"),
+        supabase.from("settlement_log").select("id, market_key, status, provider_source"),
       ]);
 
-      const results = (resultsR.data || []) as Array<{ id: string; match_status: string }>;
-      const logs = (logsR.data || []) as Array<{ id: string; market_key: string; status: string }>;
+      const results = (resultsR.data || []) as Array<{ id: string; match_status: string; provider_source: string | null }>;
+      const logs = (logsR.data || []) as Array<{ id: string; market_key: string; status: string; provider_source: string | null }>;
 
       const confirmed = results.filter((r) => r.match_status === "confirmed").length;
       const voided = results.filter((r) => ["postponed", "cancelled", "abandoned", "void"].includes(r.match_status)).length;
@@ -730,6 +731,10 @@ export function useSettlementSummary() {
         else e.error++;
       }
 
+      const providerVerified = results.filter((r) => r.provider_source === "api-football").length;
+      const backfillCount = results.filter((r) => r.provider_source === "internal_backfill").length;
+      const manualCount = results.filter((r) => r.provider_source === "manual").length;
+
       return {
         total_results: results.length,
         confirmed,
@@ -740,6 +745,7 @@ export function useSettlementSummary() {
         voidLogs,
         errorLogs,
         by_market: [...marketMap.entries()].map(([k, v]) => ({ market_key: k, ...v })),
+        by_source: { provider_verified: providerVerified, internal_backfill: backfillCount, manual: manualCount },
       };
     },
   });

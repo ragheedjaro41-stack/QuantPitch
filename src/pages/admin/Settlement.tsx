@@ -66,6 +66,31 @@ function outcomeColor(outcome: string): string {
   }
 }
 
+function sourceLabel(src: string | null | undefined): { text: string; color: string; bg: string } {
+  switch (src) {
+    case "api-football":
+      return { text: "Provider Verified", color: "#10B981", bg: "#10B98115" };
+    case "internal_backfill":
+      return { text: "Internal Backfill", color: "#fbbf24", bg: "#fbbf2415" };
+    case "manual":
+      return { text: "Manual Review", color: "#f97316", bg: "#f9731615" };
+    default:
+      return { text: src || "Unknown", color: "#64748b", bg: "#64748b15" };
+  }
+}
+
+function SourceBadge({ source }: { source: string | null | undefined }) {
+  const { text, color, bg } = sourceLabel(source);
+  return (
+    <span
+      className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ color, backgroundColor: bg, border: `1px solid ${color}30` }}
+    >
+      {text}
+    </span>
+  );
+}
+
 export default function Settlement() {
   const qc = useQueryClient();
   const { data: summary, isLoading: sL } = useSettlementSummary();
@@ -280,6 +305,27 @@ export default function Settlement() {
         </div>
       </div>
 
+      {/* Source breakdown */}
+      {summary?.by_source && (
+        <div className="flex flex-wrap gap-3 mb-8">
+          <div className="card p-3 flex items-center gap-3">
+            <SourceBadge source="api-football" />
+            <span className="font-mono text-lg font-bold text-white">{summary.by_source.provider_verified}</span>
+            <span className="text-xs text-slate-500">results</span>
+          </div>
+          <div className="card p-3 flex items-center gap-3">
+            <SourceBadge source="internal_backfill" />
+            <span className="font-mono text-lg font-bold text-white">{summary.by_source.internal_backfill}</span>
+            <span className="text-xs text-slate-500">results</span>
+          </div>
+          <div className="card p-3 flex items-center gap-3">
+            <SourceBadge source="manual" />
+            <span className="font-mono text-lg font-bold text-white">{summary.by_source.manual}</span>
+            <span className="text-xs text-slate-500">results</span>
+          </div>
+        </div>
+      )}
+
       {/* Results Sync History */}
       <h2 className="text-sm font-bold text-white mb-3">Results Sync History</h2>
       <div className="card overflow-hidden mb-8">
@@ -440,7 +486,7 @@ export default function Settlement() {
                     <span className="text-xs text-slate-400">{r.competition_type}</span>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="text-xs text-slate-400">{r.provider_source || "--"}</span>
+                    <SourceBadge source={r.provider_source} />
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs text-slate-400">{timeSince(r.confirmed_at)}</span>
@@ -571,6 +617,7 @@ export default function Settlement() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Market</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">Outcome</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-28">Source</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Reason</th>
               </tr>
             </thead>
@@ -592,6 +639,9 @@ export default function Settlement() {
                     <span className="text-xs font-bold" style={{ color: statusColor(l.status) }}>
                       {l.status.toUpperCase()}
                     </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <SourceBadge source={l.provider_source} />
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs text-slate-400">{l.reason}</span>
@@ -622,8 +672,8 @@ export default function Settlement() {
               h2h, totals, and BTTS all settle from ft_home/ft_away (90 min). Extra time and penalties are recorded but never affect standard market outcomes.
             </p>
             <p className="text-xs text-slate-300">
-              <strong className="text-white">4. No fake results.</strong>{" "}
-              Results come only from API-Football via the API_FOOTBALL_KEY secret. Missing key = no sync, no results, no settlement.
+              <strong className="text-white">4. Source tracking.</strong>{" "}
+              Every result and settlement entry is labeled by source: <span className="text-good font-semibold">Provider Verified</span> (API-Football live sync), <span className="text-warn font-semibold">Internal Backfill</span> (populated from existing DB scores), or <span style={{ color: "#f97316" }} className="font-semibold">Manual Review</span> (admin-entered). No fake results.
             </p>
             <p className="text-xs text-slate-300">
               <strong className="text-white">5. Missing final score = skip.</strong>{" "}
