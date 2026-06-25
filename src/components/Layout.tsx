@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale, Zap, Menu, X } from "lucide-react";
+import { LayoutDashboard, Shield, Users, Trophy, Globe, Settings, ChartBar as BarChart2, Database, TriangleAlert as AlertTriangle, ArrowUpDown, ClipboardList, Tag, BadgeCheck, Radio, Key, ListChecks, Scale, Zap, Menu, X, Rocket } from "lucide-react";
 
 const mainNav = [
   { to: "/",          label: "Dashboard",  icon: LayoutDashboard, end: true },
@@ -30,6 +30,7 @@ const adminNav = [
   { to: "/admin/settlement",            label: "Settlement",      icon: Scale },
   { to: "/admin/activation",            label: "Activation",      icon: ListChecks },
   { to: "/admin/certification",        label: "Certification",   icon: BadgeCheck },
+  { to: "/admin/readiness",            label: "Prod Readiness",  icon: Rocket },
 ];
 
 export default function Layout() {
@@ -88,8 +89,8 @@ export default function Layout() {
       </nav>
 
       <div className="px-6 py-4 border-t border-base-700 shrink-0">
-        <p className="text-xs text-slate-500">Premier League 2025/26</p>
-        <p className="text-xs text-slate-600 mt-0.5">20 teams · 380 fixtures</p>
+        <p className="text-xs text-slate-500">QuantPitch 2025/26</p>
+        <p className="text-xs text-slate-600 mt-0.5">Multi-league analytics</p>
       </div>
     </>
   );

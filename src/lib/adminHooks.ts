@@ -24,6 +24,8 @@ export type League = {
   stats_coverage: number;
   provider_flag: string;
   playable: boolean;
+  is_synthetic: boolean;
+  has_live_odds: boolean;
   notes: string | null;
   logo_url: string | null;
   created_at: string;
