@@ -17,6 +17,23 @@ import type {
   WCKnockoutMatch,
 } from "../types";
 
+export function usePrimaryLeague() {
+  return useQuery({
+    queryKey: ["primary-league"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leagues")
+        .select("id, name")
+        .eq("is_synthetic", false)
+        .eq("name", "Premier League")
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; name: string } | null;
+    },
+    staleTime: Infinity,
+  });
+}
+
 export function useTeams() {
   return useQuery({
     queryKey: ["teams"],
@@ -24,9 +41,15 @@ export function useTeams() {
       const { data, error } = await supabase
         .from("teams")
         .select("*")
+        .not("league_id", "is", null)
         .order("name");
       if (error) throw error;
-      return data as Team[];
+      const { data: leagues } = await supabase
+        .from("leagues")
+        .select("id")
+        .eq("is_synthetic", true);
+      const syntheticIds = new Set((leagues || []).map((l: { id: string }) => l.id));
+      return (data as Team[]).filter((t) => t.league_id && !syntheticIds.has(t.league_id));
     },
   });
 }
@@ -35,16 +58,26 @@ export function useTeamStats() {
   return useQuery({
     queryKey: ["team-stats"],
     queryFn: async () => {
+      const { data: plLeague } = await supabase
+        .from("leagues")
+        .select("id")
+        .eq("name", "Premier League")
+        .eq("is_synthetic", false)
+        .maybeSingle();
+      const plId = plLeague?.id;
+
       const { data: teams, error: te } = await supabase
         .from("teams")
         .select("*")
+        .eq("league_id", plId)
         .order("name");
       if (te) throw te;
 
       const { data: matches, error: me } = await supabase
         .from("matches")
         .select("*")
-        .eq("status", "completed");
+        .eq("status", "completed")
+        .eq("league_id", plId);
       if (me) throw me;
 
       const stats: TeamWithStats[] = (teams as Team[]).map((t) => {
@@ -128,7 +161,7 @@ export function useTeamMatches(teamId: string | undefined) {
 
       const { data: teams } = await supabase
         .from("teams")
-        .select("id, name, short_name, primary_color")
+        .select("id, name, short_name, primary_color, logo_url")
         .in("id", [...teamIds]);
 
       const teamMap = new Map((teams || []).map((t) => [t.id, t]));
@@ -146,19 +179,29 @@ export function usePlayers() {
   return useQuery({
     queryKey: ["players"],
     queryFn: async () => {
+      const { data: plLeague } = await supabase
+        .from("leagues")
+        .select("id")
+        .eq("name", "Premier League")
+        .eq("is_synthetic", false)
+        .maybeSingle();
+      const plId = plLeague?.id;
+
+      const { data: plTeams } = await supabase
+        .from("teams")
+        .select("id, name, short_name, primary_color, logo_url")
+        .eq("league_id", plId);
+
+      const teamMap = new Map((plTeams || []).map((t) => [t.id, t]));
+      const plTeamIds = [...teamMap.keys()];
+
       const { data: players, error } = await supabase
         .from("players")
         .select("*")
+        .in("team_id", plTeamIds)
         .order("rating", { ascending: false });
       if (error) throw error;
 
-      const teamIds = [...new Set((players as Player[]).map((p) => p.team_id))];
-      const { data: teams } = await supabase
-        .from("teams")
-        .select("id, name, short_name, primary_color")
-        .in("id", teamIds);
-
-      const teamMap = new Map((teams || []).map((t) => [t.id, t]));
       return (players as Player[]).map((p) => ({
         ...p,
         team: teamMap.get(p.team_id),
@@ -194,9 +237,18 @@ export function useMatches() {
   return useQuery({
     queryKey: ["matches"],
     queryFn: async () => {
+      const { data: plLeague } = await supabase
+        .from("leagues")
+        .select("id")
+        .eq("name", "Premier League")
+        .eq("is_synthetic", false)
+        .maybeSingle();
+      const plId = plLeague?.id;
+
       const { data: matches, error } = await supabase
         .from("matches")
         .select("*")
+        .eq("league_id", plId)
         .order("match_date", { ascending: false });
       if (error) throw error;
 
@@ -208,7 +260,7 @@ export function useMatches() {
 
       const { data: teams } = await supabase
         .from("teams")
-        .select("id, name, short_name, primary_color")
+        .select("id, name, short_name, primary_color, logo_url")
         .in("id", [...teamIds]);
 
       const teamMap = new Map((teams || []).map((t) => [t.id, t]));
@@ -234,7 +286,7 @@ export function useMatch(id: string | undefined) {
 
       const { data: teams } = await supabase
         .from("teams")
-        .select("id, name, short_name, primary_color, city, stadium")
+        .select("id, name, short_name, primary_color, city, stadium, logo_url")
         .in("id", [match.home_team_id, match.away_team_id]);
 
       const teamMap = new Map((teams || []).map((t) => [t.id, t]));
@@ -411,24 +463,37 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const [teamsR, playersR, matchesR, eventsR] = await Promise.all([
-        supabase.from("teams").select("*"),
-        supabase.from("players").select("*"),
-        supabase.from("matches").select("*").eq("status", "completed"),
-        supabase.from("match_events").select("*"),
+      const { data: plLeague } = await supabase
+        .from("leagues")
+        .select("id")
+        .eq("name", "Premier League")
+        .eq("is_synthetic", false)
+        .maybeSingle();
+      const plId = plLeague?.id;
+
+      const [teamsR, playersR, matchesR] = await Promise.all([
+        supabase.from("teams").select("*").eq("league_id", plId),
+        supabase.from("players").select("*").eq("competition", "league"),
+        supabase.from("matches").select("*").eq("status", "completed").eq("league_id", plId),
       ]);
 
       const teams = teamsR.data as Team[];
-      const players = playersR.data as Player[];
+      const players = (playersR.data as Player[]).filter((p) =>
+        teams.some((t) => t.id === p.team_id)
+      );
       const matches = matchesR.data as Match[];
-      const events = eventsR.data as MatchEvent[];
 
-      const totalGoals = events.filter((e) => e.event_type === "goal").length;
+      const totalGoals = matches.reduce(
+        (sum, m) => sum + m.home_score + m.away_score,
+        0
+      );
       const topScorers = [...players]
         .sort((a, b) => b.goals - a.goals || b.assists - a.assists)
         .slice(0, 5);
 
-      const goalsPerRound = Array.from({ length: 5 }, (_, i) => {
+      const maxRound = matches.reduce((max, m) => Math.max(max, m.round), 0);
+      const roundCount = Math.min(maxRound, 38);
+      const goalsPerRound = Array.from({ length: roundCount }, (_, i) => {
         const round = i + 1;
         const roundMatches = matches.filter((m) => m.round === round);
         const roundGoals = roundMatches.reduce(
@@ -446,7 +511,9 @@ export function useDashboardStats() {
         topScorers,
         goalsPerRound,
         avgRating:
-          players.reduce((sum, p) => sum + p.rating, 0) / players.length,
+          players.length > 0
+            ? players.reduce((sum, p) => sum + p.rating, 0) / players.length
+            : 0,
       };
     },
   });

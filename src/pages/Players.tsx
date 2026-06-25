@@ -22,8 +22,8 @@ export default function Players() {
   const positions = ["ALL", "Goalkeeper", "Defender", "Midfielder", "Forward"];
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
-      <PageHeader title="Players" subtitle={`${data.length} players in the league`} />
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
+      <PageHeader title="Players" subtitle={data.length > 0 ? `${data.length} players in the squad` : "Player data syncing soon"} />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <input

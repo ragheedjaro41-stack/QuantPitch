@@ -72,16 +72,19 @@ export function TeamBadge({
   short_name,
   color,
   size = "md",
+  logo_url,
 }: {
   short_name: string;
   color: string;
   size?: "sm" | "md" | "lg";
+  logo_url?: string | null;
 }) {
   const sizes = {
     sm: "h-8 w-8 text-xs",
     md: "h-10 w-10 text-sm",
     lg: "h-16 w-16 text-lg",
   };
+  const imgSizes = { sm: 24, md: 32, lg: 52 };
   return (
     <div
       className={`flex items-center justify-center rounded-xl font-mono font-bold ${sizes[size]}`}
@@ -91,7 +94,18 @@ export function TeamBadge({
         border: `1px solid ${color}40`,
       }}
     >
-      {short_name}
+      {logo_url ? (
+        <img
+          src={logo_url}
+          alt={short_name}
+          width={imgSizes[size]}
+          height={imgSizes[size]}
+          className="object-contain"
+          loading="lazy"
+        />
+      ) : (
+        short_name
+      )}
     </div>
   );
 }

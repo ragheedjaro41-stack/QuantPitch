@@ -23,7 +23,7 @@ export default function MatchDetail() {
   const isLoading = eventsLoading;
 
   return (
-    <div className="px-8 py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
       <BackLink to="/matches" label="All Matches" />
 
       {/* Scoreboard */}
@@ -35,7 +35,7 @@ export default function MatchDetail() {
 
         <div className="flex items-center justify-center gap-8">
           <div className="flex flex-col items-center gap-3 flex-1 max-w-xs">
-            <TeamBadge short_name={match.home_team?.short_name || "?"} color={match.home_team?.primary_color || "#666"} size="lg" />
+            <TeamBadge short_name={match.home_team?.short_name || "?"} color={match.home_team?.primary_color || "#666"} size="lg" logo_url={match.home_team?.logo_url} />
             <p className="text-sm font-semibold text-white text-center">{match.home_team?.name}</p>
           </div>
 
@@ -46,7 +46,7 @@ export default function MatchDetail() {
           </div>
 
           <div className="flex flex-col items-center gap-3 flex-1 max-w-xs">
-            <TeamBadge short_name={match.away_team?.short_name || "?"} color={match.away_team?.primary_color || "#666"} size="lg" />
+            <TeamBadge short_name={match.away_team?.short_name || "?"} color={match.away_team?.primary_color || "#666"} size="lg" logo_url={match.away_team?.logo_url} />
             <p className="text-sm font-semibold text-white text-center">{match.away_team?.name}</p>
           </div>
         </div>

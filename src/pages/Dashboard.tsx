@@ -22,8 +22,8 @@ export default function Dashboard() {
   if (isError || !data) return <ErrorState message="Failed to load dashboard data" />;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
-      <PageHeader title="Dashboard" subtitle="Season 2025 overview" />
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
+      <PageHeader title="Dashboard" subtitle="Premier League 2025/26" />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Teams" value={data.teamCount} icon={<Shield size={18} />} accent="#00D4FF" />
@@ -65,7 +65,13 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-white mb-1">Top Scorers</h2>
           <p className="text-xs text-slate-400 mb-6">Leading goal contributors</p>
           <div className="space-y-3">
-            {data.topScorers.map((player, i) => (
+            {data.topScorers.length === 0 ? (
+              <div className="text-center py-8">
+                <Users size={28} className="text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">Player data not yet synced</p>
+                <p className="text-xs text-slate-600 mt-1">Run a player sync to populate this section</p>
+              </div>
+            ) : data.topScorers.map((player, i) => (
               <Link
                 key={player.id}
                 to={`/players/${player.id}`}

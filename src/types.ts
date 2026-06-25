@@ -8,6 +8,10 @@ export type Team = {
   primary_color: string;
   logo_url: string | null;
   competition: string;
+  league_id: string | null;
+  country: string | null;
+  external_id: string | null;
+  active: boolean;
 };
 
 export type Player = {
@@ -70,8 +74,8 @@ export type PlayerWithTeam = Player & {
 };
 
 export type MatchWithTeams = Match & {
-  home_team: Pick<Team, "id" | "name" | "short_name" | "primary_color">;
-  away_team: Pick<Team, "id" | "name" | "short_name" | "primary_color">;
+  home_team: Pick<Team, "id" | "name" | "short_name" | "primary_color" | "logo_url">;
+  away_team: Pick<Team, "id" | "name" | "short_name" | "primary_color" | "logo_url">;
 };
 
 export type MatchEventWithPlayer = MatchEvent & {

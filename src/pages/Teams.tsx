@@ -9,11 +9,11 @@ export default function Teams() {
   if (isError || !data) return <ErrorState message="Failed to load teams" />;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
-      <PageHeader title="Teams" subtitle="League standings" />
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
+      <PageHeader title="Teams" subtitle="Premier League standings" />
 
-      <div className="card overflow-hidden">
-        <table className="w-full">
+      <div className="card overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-base-700 bg-base-700/30">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-12">#</th>
@@ -41,7 +41,7 @@ export default function Teams() {
                 </td>
                 <td className="px-4 py-3.5">
                   <Link to={`/teams/${team.id}`} className="flex items-center gap-3 group">
-                    <TeamBadge short_name={team.short_name} color={team.primary_color} size="sm" />
+                    <TeamBadge short_name={team.short_name} color={team.primary_color} size="sm" logo_url={team.logo_url} />
                     <div>
                       <p className="text-sm font-medium text-white group-hover:text-accent transition-colors">{team.name}</p>
                       <p className="text-xs text-slate-500">{team.city}</p>

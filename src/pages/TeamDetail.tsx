@@ -18,13 +18,13 @@ export default function TeamDetail() {
   const isLoading = playersLoading || matchesLoading;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <BackLink to="/teams" label="All Teams" />
 
       {/* Team header */}
       <div className="card p-6 mb-6">
         <div className="flex items-start gap-5">
-          <TeamBadge short_name={team.short_name} color={team.primary_color} size="lg" />
+          <TeamBadge short_name={team.short_name} color={team.primary_color} size="lg" logo_url={team.logo_url} />
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">{team.name}</h1>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-400">

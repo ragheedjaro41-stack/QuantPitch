@@ -10,7 +10,7 @@ export default function Matches() {
   if (isError || !data) return <ErrorState message="Failed to load matches" />;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
       <PageHeader title="Matches" subtitle={`${data.length} matches this season`} />
 
       {data.length === 0 ? (
@@ -33,7 +33,7 @@ export default function Matches() {
                   <span className="text-sm font-medium text-white group-hover:text-accent transition-colors text-right">
                     {m.home_team?.name}
                   </span>
-                  <TeamBadge short_name={m.home_team?.short_name || "?"} color={m.home_team?.primary_color || "#666"} size="sm" />
+                  <TeamBadge short_name={m.home_team?.short_name || "?"} color={m.home_team?.primary_color || "#666"} size="sm" logo_url={m.home_team?.logo_url} />
                 </div>
 
                 <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-base-700/60">
@@ -43,7 +43,7 @@ export default function Matches() {
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-1">
-                  <TeamBadge short_name={m.away_team?.short_name || "?"} color={m.away_team?.primary_color || "#666"} size="sm" />
+                  <TeamBadge short_name={m.away_team?.short_name || "?"} color={m.away_team?.primary_color || "#666"} size="sm" logo_url={m.away_team?.logo_url} />
                   <span className="text-sm font-medium text-white group-hover:text-accent transition-colors">
                     {m.away_team?.name}
                   </span>
