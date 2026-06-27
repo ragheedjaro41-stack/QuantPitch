@@ -1,8 +1,8 @@
 
 -- Move all fictional domestic teams from Premier League to QuantPitch Demo League
--- Demo League ID: 20d22dc5-d36b-4747-9ebd-4ef1a0adb740
+-- Demo League lookup by short_name = 'DEMO'
 UPDATE teams
-SET league_id = '20d22dc5-d36b-4747-9ebd-4ef1a0adb740'
+SET league_id = (SELECT id FROM leagues WHERE short_name = 'DEMO')
 WHERE competition = 'league';
 
 -- Relink all domestic matches via home team (cascade)

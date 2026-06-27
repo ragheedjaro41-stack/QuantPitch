@@ -2,7 +2,7 @@
 -- Link all domestic league teams to Premier League (England Tier 1)
 -- These are the fictional demo teams representing a single fictional top-flight league
 UPDATE teams
-SET league_id = '225cd2f4-2a69-4989-99bb-a0569baa5391'
+SET league_id = (SELECT id FROM leagues WHERE short_name = 'PL')
 WHERE competition = 'league' AND league_id IS NULL;
 
 -- Backfill matches.league_id via home team
