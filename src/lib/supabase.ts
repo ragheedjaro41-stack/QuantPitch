@@ -25,6 +25,7 @@ function getClient(): SupabaseClient {
  */
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
-    return (getClient() as Record<string | symbol, unknown>)[prop];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (getClient() as any)[prop];
   },
 });
